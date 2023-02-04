@@ -13,6 +13,7 @@ from pathlib import Path, PureWindowsPath
 from re import findall, sub
 from shutil import copy as shcopy
 from subprocess import run, Popen, PIPE
+from textwrap import wrap
 from time import perf_counter
 from typing import Tuple, Union
 from selectors import DefaultSelector, EVENT_READ
@@ -43,7 +44,7 @@ class BuildType(Enum):
 
 class Paint:
 
-    class Color(Enum):
+    class LegacyColor(Enum):
 
         RED          = (1, 31, 40,)
         GREEN        = (1, 32, 40,)
@@ -55,12 +56,33 @@ class Paint:
         SOLID_YELLOW = (2, 30, 43,)
 
 
+    class Color(Enum):
+
+        RED         = 'ff0000'
+        GREEN       = '00ff00'
+        BLUE        = '0000ff'
+        WHITE       = 'fffffe'
+        BLACK       = '000001'
+        CYAN        = '00ffff'
+        MAGENTA     = 'ff00ff'
+        YELLOW      = 'ffff00'
+
+
     @staticmethod
-    def paint(text: str, color: Color):
+    def paint(text: str, fgcolor: Color, bgcolor: Color = None):
         '''
         Formats/highlights text to be printed on the console as per the ANSI coloring scheme.
         '''
-        return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
+        colored_text = '\033[38;2;'
+        hex_to_seq = lambda y: ';'.join(map(lambda x: str(int(x, 16)), wrap(y.value, 2))) + 'm'
+        colored_text += hex_to_seq(fgcolor)
+        if bgcolor:
+            colored_text += '\033[48;2;'
+            colored_text += hex_to_seq(bgcolor)
+        colored_text += text
+        colored_text += '\033[0m'
+        return colored_text
+        # return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
 
 
 class PrettyTable:
@@ -101,13 +123,14 @@ class PrettyTable:
 
 
     def _print_row(self, *args) -> None:
-        
+
         if len(args) != len(self._BASE_HEADERS):
             raise Exception() # FIXME
-        width = tuple(self._width[i] + len(Paint.paint('', arg[1])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
+        widths = tuple(self._width[i] + len(Paint.paint('', *arg[1:])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
+        # apply paint to arguments if they carry any
         args = [Paint.paint(*arg) if type(arg) is tuple else arg for arg in args]
 
-        print(self.Char.VER_SEP.value.join([''] + [f' {arg:<{width[i]}}' for i, arg in enumerate(args)] + ['']))
+        print(self.Char.VER_SEP.value.join([''] + [f' {arg:<{widths[i]}}' for i, arg in enumerate(args)] + ['']))
         
 
     def print_all(self) -> None:
@@ -115,7 +138,7 @@ class PrettyTable:
         if not self._results:
             return
 
-        print('\n[SUMMARY]')
+        print('\n[SUMMARY]')    # FIXME: probably not the right place
         self._width[0] = len(str(len(self._results))) + 1
         print(
             self.Char.TOP_LEFT.value +
@@ -129,13 +152,12 @@ class PrettyTable:
             self.Char.MID_RIGHT.value
         )
         for idx, (build_type, (result, comment)) in enumerate(self._results.items()):
-            
             result_color = {
-                'FAIL': Paint.Color.SOLID_RED,
-                'PASS': Paint.Color.SOLID_GREEN,
-                'N/A' : Paint.Color.SOLID_YELLOW,
-            }.get(result.upper(), Paint.Color.SOLID_YELLOW)
-            self._print_row(str(idx+1), (build_type.value, Paint.Color.CYAN), (result, result_color), comment)
+                'FAIL': (Paint.Color.WHITE, Paint.Color.RED),
+                'PASS': (Paint.Color.BLACK, Paint.Color.GREEN),
+                'N/A' : (Paint.Color.BLACK, Paint.Color.YELLOW),
+            }.get(result.upper(), (Paint.Color.BLACK, Paint.Color.YELLOW))
+            self._print_row(str(idx+1), (build_type.value, Paint.Color.CYAN), (result, *result_color), comment)
         print(
             self.Char.BOT_LEFT.value +
             self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
