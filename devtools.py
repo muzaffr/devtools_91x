@@ -134,7 +134,7 @@ class PrettyTable:
                 'FAIL': Paint.Color.SOLID_RED,
                 'PASS': Paint.Color.SOLID_GREEN,
                 'N/A' : Paint.Color.SOLID_YELLOW,
-            }[result.upper()]
+            }.get(result.upper(), Paint.Color.SOLID_YELLOW)
             self._print_row(str(idx+1), (build_type.value, Paint.Color.CYAN), (result, result_color), comment)
         print(
             self.Char.BOT_LEFT.value +
@@ -320,6 +320,12 @@ class DeveloperToolbox:
             dest='base_branch',
             help='Specify the base branch. This is only used to check formatting and if your branch is in sync with remote.',
             metavar='<branch-name>'
+        )
+        parser.add_argument(
+            '-r', '--remote',
+            dest='remote',
+            action='store_true',
+            help='Check if the base branch is in sync with remote (origin).',
         )
         parser.add_argument(
             '-c', '--clang-check',
@@ -597,7 +603,10 @@ class DeveloperToolbox:
                     else:
                         print(f'{file} {Paint.paint("requires styling fixes.", Paint.Color.RED)}')
         if styling_needed:
-            self._pretty_table.add_result(Test.STYLE_CHECK, 'FAIL', 'Needs styling.')
+            if apply:
+                self._pretty_table.add_result(Test.STYLE_CHECK, 'DONE', 'Styling applied.')
+            else:
+                self._pretty_table.add_result(Test.STYLE_CHECK, 'FAIL', 'Needs styling.')
         else:
             print(f'{Paint.paint("No styling changes required.", Paint.Color.GREEN)}')
             self._pretty_table.add_result(Test.STYLE_CHECK, 'PASS', 'Styling proper.')
