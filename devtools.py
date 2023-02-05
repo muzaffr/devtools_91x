@@ -14,7 +14,8 @@ from re import findall, sub
 from shutil import copy as shcopy
 from subprocess import run, Popen, PIPE
 from textwrap import wrap
-from time import perf_counter
+from time import perf_counter, sleep
+from threading import Thread, Event
 from typing import Tuple, Union
 from selectors import DefaultSelector, EVENT_READ
 
@@ -163,6 +164,26 @@ class PrettyTable:
             self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
             self.Char.BOT_RIGHT.value
         )
+
+
+class ElapsedTimeThread(Thread):
+    """Stoppable thread that prints the time elapsed"""
+    def __init__(self):
+        super(ElapsedTimeThread, self).__init__()
+        self._stop_event = Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
+    def run(self):
+        thread_start = perf_counter()
+        while not self.stopped():
+            print(f'\rElapsed time: {perf_counter() - thread_start:.2f}s', end='')
+            # include a delay here so the thread doesn't uselessly hog the CPU
+            sleep(0.01)
 
 
 class WarningTracker:
@@ -700,6 +721,8 @@ class DeveloperToolbox:
         sel = DefaultSelector()
         sel.register(p.stdout, EVENT_READ)
         sel.register(p.stderr, EVENT_READ)
+        elapsed_time_thread = ElapsedTimeThread()
+        elapsed_time_thread.start()
         compiler_log = ''
         categorized_logs = {
             'linker': '',
@@ -743,7 +766,8 @@ class DeveloperToolbox:
                     else:
                         context += line
 
-
+        elapsed_time_thread.stop()
+        elapsed_time_thread.join()
         print(f'Command executed. [{perf_counter() - initial_time:.1f}s]')
 
         with open(self._LOG_FILE, 'a') as logfile:
