@@ -507,7 +507,7 @@ class DeveloperToolbox:
         subparsers = parser.add_subparsers()
         warnings_parser = subparsers.add_parser('warnings', aliases=['wa'])
         warnings_parser.add_argument('wc', metavar='chip')
-        warnings_parser.add_argument('--thorough')
+        warnings_parser.add_argument('--thorough', action='store_true')
         
         args = parser.parse_args()
 
