@@ -573,7 +573,7 @@ class DeveloperToolbox:
         finally:
             self._git_imprint_wipe()
             self._pretty_table.print_all()
-            get_output(f'cp {self._LOG_FILE} logdt.txt')
+            get_output(f'cp {self._LOG_FILE} {self._COEX_PATH / "logdt.txt"}')
 
 
     def _git_imprint(self) -> None:
@@ -607,10 +607,11 @@ class DeveloperToolbox:
         print(Paint.paint('\n[BRANCH]', Paint.Color.SILVER))
         current_branch = get_output('git branch --show-current')
         log = get_output(f'git log --pretty=format:%D HEAD^')
-        base_branch = log[log.find('origin/'):].partition('\n')[0].partition(',')[0]
-        if current_branch and current_branch in base_branch:
-            log = get_output(f'git log --pretty=format:%D {base_branch}^')
-            base_branch = log[log.find('origin/'):].partition('\n')[0].partition(',')[0]
+        refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
+        if current_branch and current_branch in refs_to_head:
+            log = get_output(f'git log --pretty=format:%D {refs_to_head[0]}^')
+            refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
+        base_branch = sorted((x for x in refs_to_head if x.startswith('origin/') and not x.endswith('HEAD')), key=lambda s: len(s))[0]
         self._base_branch = base_branch
         self._merge_base = base_branch
         print(f'Assuming base branch is {Paint.paint(self._base_branch, Paint.Color.CAPRI)}. '
