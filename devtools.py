@@ -267,6 +267,7 @@ class DeveloperToolbox:
         self._builds = []
 
         self._git_was_dirty = False
+        self._actual_head = ''
         self._short_commit_hash = ''
         self._base_branch = ''
         self._merge_base = ''
@@ -579,6 +580,7 @@ class DeveloperToolbox:
     def _git_imprint(self) -> None:
 
         print(Paint.paint('\n[GIT]', Paint.Color.SILVER))
+        self._actual_head = get_output('git rev-parse HEAD')
         if run('git diff --quiet'.split(), cwd=self._BASE_PATH).returncode:
             print(f'{Paint.paint("Uncommitted changes found.", Paint.Color.ORANGE)}\nLeaving fingerprint...')
             get_output('git commit -am fingerprint')
@@ -606,7 +608,7 @@ class DeveloperToolbox:
 
         print(Paint.paint('\n[BRANCH]', Paint.Color.SILVER))
         current_branch = get_output('git branch --show-current')
-        log = get_output(f'git log --pretty=format:%D HEAD^')
+        log = get_output(f'git log --pretty=format:%D {self._actual_head}^')
         refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
         if current_branch and current_branch in refs_to_head:
             log = get_output(f'git log --pretty=format:%D {refs_to_head[0]}^')
@@ -671,10 +673,10 @@ class DeveloperToolbox:
 
         if run(f'git rev-parse --verify {branch_name}'.split(), capture_output=True).returncode:
             raise NameError('Branch name or commit ID invalid.')
-        if run(f'git merge-base --is-ancestor {branch_name} HEAD'.split(), capture_output=True).returncode:
+        if run(f'git merge-base --is-ancestor {branch_name} {self._actual_head}'.split(), capture_output=True).returncode:
             print('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.')
         self._base_branch = branch_name
-        self._merge_base = get_output(f'git merge-base {branch_name} HEAD')
+        self._merge_base = get_output(f'git merge-base {branch_name} {self._actual_head}')
 
 
     def set_name(self, name: str) -> None:
@@ -684,6 +686,7 @@ class DeveloperToolbox:
 
     def check_warnings(self, build: BuildType) -> None:
 
+        print('mb', self._merge_base)
         if not self._merge_base:
             self._infer_base_branch()
         self._warning_tracker.set_db('new')
