@@ -62,11 +62,16 @@ class Paint:
         RED         = 'ff0000'
         GREEN       = '00ff00'
         BLUE        = '0000ff'
-        WHITE       = 'fffffe'
-        BLACK       = '000001'
+        WHITE       = 'ffffff'
+        BLACK       = '000000'
         CYAN        = '00ffff'
         MAGENTA     = 'ff00ff'
         YELLOW      = 'ffff00'
+        GRAY        = '6f6f6f'
+        SILVER      = '9f9f9f'
+        ORANGE      = 'ff7f00'
+        CAPRI       = '00bfff'
+        TEAL        = '7fffff'
 
 
     @staticmethod
@@ -139,7 +144,7 @@ class PrettyTable:
         if not self._results:
             return
 
-        print('\n[SUMMARY]')    # FIXME: probably not the right place
+        print(Paint.paint('\n[SUMMARY]', Paint.Color.SILVER))    # FIXME: probably not the right place
         self._width[0] = len(str(len(self._results))) + 1
         print(
             self.Char.TOP_LEFT.value +
@@ -158,7 +163,7 @@ class PrettyTable:
                 'PASS': (Paint.Color.BLACK, Paint.Color.GREEN),
                 'N/A' : (Paint.Color.BLACK, Paint.Color.YELLOW),
             }.get(result.upper(), (Paint.Color.BLACK, Paint.Color.YELLOW))
-            self._print_row(str(idx+1), (build_type.value, Paint.Color.CYAN), (result, *result_color), comment)
+            self._print_row(str(idx+1), (build_type.value, Paint.Color.CAPRI), (result, *result_color), comment)
         print(
             self.Char.BOT_LEFT.value +
             self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
@@ -183,7 +188,7 @@ class ElapsedTimeThread(Thread):
         while not self.stopped():
             print(f'\rElapsed time: {perf_counter() - thread_start:.2f}s', end='')
             # include a delay here so the thread doesn't uselessly hog the CPU
-            sleep(0.01)
+            sleep(0.07)
 
 
 class WarningTracker:
@@ -216,27 +221,28 @@ class WarningTracker:
             db[warning] = 1
 
 
-    def get_diff(self, thorough: bool=False):
+    def get_diff(self):
 
-        if thorough:
-            removed_db, added_db = {}, {}
-            for warning, count in self._old_db.items():
-                if warning in self._new_db:
-                    count_diff = self._new_db[warning] - count
-                else:
-                    count_diff = -count
-                if count_diff < 0:
-                    removed_db[warning] = -count_diff
-                elif count_diff > 0:
-                    added_db[warning] = count_diff
-            for warning, count in self._new_db.items():
-                if warning not in self._old_db:
-                    added_db[warning] = count
-            print(f'{sum(removed_db.values())} warnings removed.')
-            print(f'{sum(added_db.values())} warnings added.')
-        else:
-            count_diff = sum(self._new_db.values()) - sum(self._old_db.values())
-            print(f'{abs(count_diff)} warnings {("added", "removed")[int(count_diff < 0)]}')
+        print(Paint.paint('\n[WARNINGS]', Paint.Color.SILVER))
+        removed_db, added_db = {}, {}
+        for warning, count in self._old_db.items():
+            if warning in self._new_db:
+                count_diff = self._new_db[warning] - count
+            else:
+                count_diff = -count
+            if count_diff < 0:
+                removed_db[warning] = -count_diff
+            elif count_diff > 0:
+                added_db[warning] = count_diff
+        for warning, count in self._new_db.items():
+            if warning not in self._old_db:
+                added_db[warning] = count
+        for warning in removed_db:
+            print(warning)
+        for warning in removed_db:
+            print(warning)
+        print(f'{sum(removed_db.values())} warnings removed.')
+        print(f'{sum(added_db.values())} warnings added.')
 
 
 class DeveloperToolbox:
@@ -511,9 +517,9 @@ class DeveloperToolbox:
         
         args = parser.parse_args()
 
-        dic = vars(args).copy()
-        dic.pop('base_branch')
-        if not(any(x for x in dic.values())):
+        clargs = vars(args).copy()
+        clargs.pop('base_branch')
+        if not any(x for x in clargs.values()):
             parser.print_help()
             return
 
@@ -521,18 +527,17 @@ class DeveloperToolbox:
         self._git_imprint()
 
         try:
-            if 'wc' in dic:
+            if args.base_branch:
+                self.set_base_branch(args.base_branch)
+            if args.name:
+                self.set_name(args.name)
+            if 'wc' in clargs:
                 self._warning_tracker = WarningTracker()
                 if args.wc in ('9117', '7', 'A0'):
                     self.check_warnings(BuildType.RS9117_A0)
                 elif args.wc in ('B', 'B0'):
                     self.check_warnings(BuildType.RS9117_B0)
-                return
-
-            if args.base_branch:
-                self.set_base_branch(args.base_branch)
-            if args.name:
-                self.set_name(args.name)
+                raise GeneratorExit()   # HACK: used to wipe imprint
             if args.all or args.clang_check or args.clang_format or args.remote:
                 self._infer_base_branch()
             if args.all or args.remote:
@@ -561,19 +566,23 @@ class DeveloperToolbox:
                 self.add_build(BuildType.RS9116_A11_ANT)
             if self._builds:
                 self.execute_builds()
+
+        except GeneratorExit:
+            pass
         finally:
+            self._git_imprint_wipe()
             self._pretty_table.print_all()
 
 
     def _git_imprint(self) -> None:
 
-        print('\n[GIT]')
+        print(Paint.paint('\n[GIT]', Paint.Color.SILVER))
         if run('git diff --quiet'.split(), cwd=self._BASE_PATH).returncode:
-            print('Uncommitted changes found.\nLeaving fingerprint...')
+            print(f'{Paint.paint("Uncommitted changes found.", Paint.Color.ORANGE)}\nLeaving fingerprint...')
             get_output('git commit -am fingerprint')
             self._git_was_dirty = True
         short_commit_hash = get_output('git rev-parse --short HEAD')
-        print(f'On commit {Paint.paint(short_commit_hash, Paint.Color.YELLOW)}')
+        print(f'On commit {Paint.paint(short_commit_hash, Paint.Color.CAPRI)}')
         commit_hash = get_output('git rev-parse HEAD')
         self._short_commit_hash = short_commit_hash
         with open(self._LOG_FILE, 'a') as logfile:
@@ -585,15 +594,15 @@ class DeveloperToolbox:
 
     def _git_imprint_wipe(self) -> None:
 
-        print('\n[GIT]')
         if self._git_was_dirty:
+            print(Paint.paint('\n[GIT]', Paint.Color.SILVER))
             get_output('git reset HEAD^')
-            print('\nWiped fingerprint.')
+            print('Wiped fingerprint.')
 
 
     def _infer_base_branch(self) -> None:
 
-        print('\n[BRANCH]')
+        print(Paint.paint('\n[BRANCH]', Paint.Color.SILVER))
         current_branch = get_output('git branch --show-current')
         log = get_output(f'git log --pretty=format:%D HEAD^')
         base_branch = log[log.find('origin/'):].partition('\n')[0].partition(',')[0]
@@ -602,13 +611,13 @@ class DeveloperToolbox:
             base_branch = log[log.find('origin/'):].partition('\n')[0].partition(',')[0]
         self._base_branch = base_branch
         self._merge_base = base_branch
-        print(f'Assuming base branch is {Paint.paint(self._base_branch, Paint.Color.CYAN)}. '
+        print(f'Assuming base branch is {Paint.paint(self._base_branch, Paint.Color.CAPRI)}. '
                 'If incorrect, specify the correct base branch using --bb.')
 
 
     def check_remote_sync(self):
 
-        print('\n[REMOTE]')
+        print(Paint.paint('\n[REMOTE]', Paint.Color.SILVER))
         fetch_process = run('git fetch --dry-run'.split(), capture_output=True)
         git_fetch_output = (fetch_process.stdout + fetch_process.stderr).decode('utf-8').rstrip()
         if fetch_process.returncode:
@@ -626,7 +635,7 @@ class DeveloperToolbox:
 
     def check_styling(self, apply: bool=False) -> None:
 
-        print('\n[STYLING]')
+        print(Paint.paint('\n[STYLING]', Paint.Color.SILVER))
         diff_files = get_output(f'git diff --name-only {self._merge_base}').split('\n')
         styling_needed = False
         for file in diff_files:
@@ -672,17 +681,15 @@ class DeveloperToolbox:
 
     def check_warnings(self, build: BuildType) -> None:
 
+        if not self._merge_base:
+            self._infer_base_branch()
         self._warning_tracker.set_db('new')
-        run('git rev-parse HEAD'.split())
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
                 get_output(f'git restore {self._METADATA[build][file]}')
-        if not self._merge_base:
-            self._infer_base_branch()
         get_output(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
-        run('git rev-parse HEAD'.split())
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
@@ -711,17 +718,19 @@ class DeveloperToolbox:
             'path': None,
             'logs': {},
         }
-        initial_time = perf_counter()
         if skip_clean is False:
             run('make clean'.split(), cwd=invoc)
         cmd = ['make'] + list(options)
+        print(Paint.paint(f'[[ {" ".join(cmd)} ]]', Paint.Color.GRAY))
         if self._multithreading:
             cmd.append('-j')
+            cmd.append('-Orecurse')
         p = Popen(cmd, cwd=invoc, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         sel = DefaultSelector()
         sel.register(p.stdout, EVENT_READ)
         sel.register(p.stderr, EVENT_READ)
         elapsed_time_thread = ElapsedTimeThread()
+        elapsed_time_thread.daemon = True
         elapsed_time_thread.start()
         compiler_log = ''
         categorized_logs = {
@@ -760,7 +769,7 @@ class DeveloperToolbox:
                         # TODO: to be enabled on the day when we no more have an insane number of warnings
                         # categorized_logs['warning'] += context
                         if self._warning_tracker:
-                            self._warning_tracker.add(line)
+                            self._warning_tracker.add(context + line)
                         context = ''
                         # categorized_logs['warning'] += line
                     else:
@@ -768,7 +777,7 @@ class DeveloperToolbox:
 
         elapsed_time_thread.stop()
         elapsed_time_thread.join()
-        print(f'Command executed. [{perf_counter() - initial_time:.1f}s]')
+        print()
 
         with open(self._LOG_FILE, 'a') as logfile:
             logfile.write(f'\n[[{" ".join(cmd)}]]\n')
@@ -810,23 +819,23 @@ class DeveloperToolbox:
 
         if not self._builds:
             return
-        print('\n[BUILDS]')
+        print(Paint.paint('\n[BUILDS]', Paint.Color.SILVER))
         # HACK: use invoc? research chdir
         chdir(self._COEX_PATH)
         # remove any duplicates
         self._builds = dict.fromkeys(self._builds).keys()
         try:
             for build in self._builds:
-                print(f'Building {build.name}...')
+                print(f'Building {Paint.paint(build.name, Paint.Color.TEAL)}...')
                 if build.name.endswith('ROM'):
                     result = self._check_rom(build)
                     if result is False:
-                        print('ROM changed.')
+                        print(Paint.paint('ROM changed.', Paint.Color.RED))
                         self._pretty_table.add_result(build, 'FAIL', 'ROM changed.')
                         if self._break_on_failure:
                             break
                     else:
-                        print('ROM unchanged.')
+                        print(Paint.paint('ROM unchanged.', Paint.Color.GREEN))
                         self._pretty_table.add_result(build, 'PASS', 'ROM unchanged.')
                 else:
                     flash_target = self._DEST_PATH / f'{build.name}_{self._short_commit_hash}.rps'
@@ -840,9 +849,9 @@ class DeveloperToolbox:
                     if results['status'] == 'PASS':
                         flash_src = results['path']
                         shcopy(flash_src, flash_target)
-                        print('Compilation successful.')
+                        print(Paint.paint('Compilation successful.', Paint.Color.GREEN))
                     else:
-                        print('Compilation failed.')
+                        print(Paint.paint('Compilation failed.', Paint.Color.RED))
                         if results['logs']['error']:
                             print(f'\nError log:\n{results["logs"]["error"]}')
                         if results['logs']['linker']:
