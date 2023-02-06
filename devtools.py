@@ -239,7 +239,7 @@ class WarningTracker:
                 added_db[warning] = count
         for warning in removed_db:
             print(warning)
-        for warning in removed_db:
+        for warning in added_db:
             print(warning)
         print(f'{sum(removed_db.values())} warnings removed.')
         print(f'{sum(added_db.values())} warnings added.')
@@ -539,7 +539,8 @@ class DeveloperToolbox:
                     self.check_warnings(BuildType.RS9117_B0)
                 raise GeneratorExit()   # HACK: used to wipe imprint
             if args.all or args.clang_check or args.clang_format or args.remote:
-                self._infer_base_branch()
+                if not self._base_branch:
+                    self._infer_base_branch()
             if args.all or args.remote:
                 self.check_remote_sync()
             if args.clang_format:
@@ -572,6 +573,7 @@ class DeveloperToolbox:
         finally:
             self._git_imprint_wipe()
             self._pretty_table.print_all()
+            get_output(f'cp {self._LOG_FILE} logdt.txt')
 
 
     def _git_imprint(self) -> None:
