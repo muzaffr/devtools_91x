@@ -674,7 +674,8 @@ class DeveloperToolbox:
 
         if run(f'git rev-parse --verify {branch_name}'.split(), capture_output=True).returncode:
             raise NameError('Branch name or commit ID invalid.')
-        if run(f'git merge-base --is-ancestor {self._actual_head} {branch_name}'.split(), capture_output=True).returncode:
+        if run(f'git merge-base --is-ancestor {self._actual_head} {branch_name}'.split(), capture_output=True).returncode \
+            and run(f'git merge-base --is-ancestor {branch_name} {self._actual_head}'.split(), capture_output=True).returncode: # HACK
             print(paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.', Color.YELLOW))
         self._base_branch = branch_name
         self._merge_base = get_output(f'git merge-base {branch_name} {self._actual_head}')
