@@ -43,52 +43,49 @@ class BuildType(Enum):
     RS9117_A1       = '9117 A1'
 
 
-class Paint:
+class Color(Enum):
 
-    class LegacyColor(Enum):
-
-        RED          = (1, 31, 40,)
-        GREEN        = (1, 32, 40,)
-        YELLOW       = (1, 33, 40,)
-        CYAN         = (1, 36, 40,)
-        PURPLE       = (1, 35, 40,)
-        SOLID_RED    = (1, 37, 41,)
-        SOLID_GREEN  = (2, 30, 42,)
-        SOLID_YELLOW = (2, 30, 43,)
-
-
-    class Color(Enum):
-
-        RED         = 'ff0000'
-        GREEN       = '00ff00'
-        BLUE        = '0000ff'
-        WHITE       = 'ffffff'
-        BLACK       = '000000'
-        CYAN        = '00ffff'
-        MAGENTA     = 'ff00ff'
-        YELLOW      = 'ffff00'
-        GRAY        = '6f6f6f'
-        SILVER      = '9f9f9f'
-        ORANGE      = 'ff7f00'
-        CAPRI       = '00bfff'
-        TEAL        = '7fffff'
+    RED         = 'ff0000'
+    GREEN       = '00ff00'
+    BLUE        = '0000ff'
+    WHITE       = 'ffffff'
+    BLACK       = '000000'
+    CYAN        = '00ffff'
+    MAGENTA     = 'ff00ff'
+    YELLOW      = 'ffff00'
+    GRAY        = '6f6f6f'
+    SILVER      = '9f9f9f'
+    ORANGE      = 'ff7f00'
+    CAPRI       = '00bfff'
+    TEAL        = '7fffff'
 
 
-    @staticmethod
-    def paint(text: str, fgcolor: Color, bgcolor: Color = None):
-        '''
-        Formats/highlights text to be printed on the console as per the ANSI coloring scheme.
-        '''
-        colored_text = '\033[38;2;'
-        hex_to_seq = lambda y: ';'.join(map(lambda x: str(int(x, 16)), wrap(y.value, 2))) + 'm'
-        colored_text += hex_to_seq(fgcolor)
-        if bgcolor:
-            colored_text += '\033[48;2;'
-            colored_text += hex_to_seq(bgcolor)
-        colored_text += text
-        colored_text += '\033[0m'
-        return colored_text
-        # return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
+class LegacyColor(Enum):
+
+    RED          = (1, 31, 40,)
+    GREEN        = (1, 32, 40,)
+    YELLOW       = (1, 33, 40,)
+    CYAN         = (1, 36, 40,)
+    PURPLE       = (1, 35, 40,)
+    SOLID_RED    = (1, 37, 41,)
+    SOLID_GREEN  = (2, 30, 42,)
+    SOLID_YELLOW = (2, 30, 43,)
+
+
+def paint(text: str, fgcolor: Color, bgcolor: Color = None):
+    '''
+    Formats/highlights text to be printed on the console as per the ANSI coloring scheme.
+    '''
+    colored_text = '\033[38;2;'
+    hex_to_seq = lambda y: ';'.join(map(lambda x: str(int(x, 16)), wrap(y.value, 2))) + 'm'
+    colored_text += hex_to_seq(fgcolor)
+    if bgcolor:
+        colored_text += '\033[48;2;'
+        colored_text += hex_to_seq(bgcolor)
+    colored_text += text
+    colored_text += '\033[0m'
+    return colored_text
+    # return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
 
 
 class PrettyTable:
@@ -132,9 +129,9 @@ class PrettyTable:
 
         if len(args) != len(self._BASE_HEADERS):
             raise Exception() # FIXME
-        widths = tuple(self._width[i] + len(Paint.paint('', *arg[1:])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
+        widths = tuple(self._width[i] + len(paint('', *arg[1:])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
         # apply paint to arguments if they carry any
-        args = [Paint.paint(*arg) if type(arg) is tuple else arg for arg in args]
+        args = [paint(*arg) if type(arg) is tuple else arg for arg in args]
 
         print(self.Char.VER_SEP.value.join([''] + [f' {arg:<{widths[i]}}' for i, arg in enumerate(args)] + ['']))
         
@@ -144,7 +141,7 @@ class PrettyTable:
         if not self._results:
             return
 
-        print(Paint.paint('\n[SUMMARY]', Paint.Color.SILVER))    # FIXME: probably not the right place
+        print(paint('\n[SUMMARY]', Color.SILVER))    # FIXME: probably not the right place
         self._width[0] = len(str(len(self._results))) + 1
         print(
             self.Char.TOP_LEFT.value +
@@ -159,11 +156,11 @@ class PrettyTable:
         )
         for idx, (build_type, (result, comment)) in enumerate(self._results.items()):
             result_color = {
-                'FAIL': (Paint.Color.WHITE, Paint.Color.RED),
-                'PASS': (Paint.Color.BLACK, Paint.Color.GREEN),
-                'N/A' : (Paint.Color.BLACK, Paint.Color.YELLOW),
-            }.get(result.upper(), (Paint.Color.BLACK, Paint.Color.YELLOW))
-            self._print_row(str(idx+1), (build_type.value, Paint.Color.CAPRI), (result, *result_color), comment)
+                'FAIL': (Color.WHITE, Color.RED),
+                'PASS': (Color.BLACK, Color.GREEN),
+                'N/A' : (Color.BLACK, Color.YELLOW),
+            }.get(result.upper(), (Color.BLACK, Color.YELLOW))
+            self._print_row(str(idx+1), (build_type.value, Color.CAPRI), (result, *result_color), comment)
         print(
             self.Char.BOT_LEFT.value +
             self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
@@ -223,7 +220,7 @@ class WarningTracker:
 
     def get_diff(self):
 
-        print(Paint.paint('\n[WARNINGS]', Paint.Color.SILVER))
+        print(paint('\n[WARNINGS]', Color.SILVER))
         removed_db, added_db = {}, {}
         for warning, count in self._old_db.items():
             if warning in self._new_db:
@@ -583,14 +580,14 @@ class DeveloperToolbox:
 
     def _git_imprint(self) -> None:
 
-        print(Paint.paint('\n[GIT]', Paint.Color.SILVER))
+        print(paint('\n[GIT]', Color.SILVER))
         self._actual_head = get_output('git rev-parse HEAD')
         if run('git diff --quiet'.split(), cwd=self._BASE_PATH).returncode:
-            print(f'{Paint.paint("Uncommitted changes found.", Paint.Color.ORANGE)}\nLeaving fingerprint...')
+            print(f'{paint("Uncommitted changes found.", Color.ORANGE)}\nLeaving fingerprint...')
             get_output('git commit -am fingerprint')
             self._git_was_dirty = True
         short_commit_hash = get_output('git rev-parse --short HEAD')
-        print(f'On commit {Paint.paint(short_commit_hash, Paint.Color.CAPRI)}')
+        print(f'On commit {paint(short_commit_hash, Color.CAPRI)}')
         commit_hash = get_output('git rev-parse HEAD')
         self._short_commit_hash = short_commit_hash
         with open(self._LOG_FILE, 'a') as logfile:
@@ -603,14 +600,14 @@ class DeveloperToolbox:
     def _git_imprint_wipe(self) -> None:
 
         if self._git_was_dirty:
-            print(Paint.paint('\n[GIT]', Paint.Color.SILVER))
+            print(paint('\n[GIT]', Color.SILVER))
             get_output('git reset HEAD^')
             print('Wiped fingerprint.')
 
 
     def _infer_base_branch(self) -> None:
 
-        print(Paint.paint('\n[BRANCH]', Paint.Color.SILVER))
+        print(paint('\n[BRANCH]', Color.SILVER))
         current_branch = get_output('git branch --show-current')
         log = get_output(f'git log --pretty=format:%D {self._actual_head}^')
         refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
@@ -620,31 +617,31 @@ class DeveloperToolbox:
         base_branch = sorted((x for x in refs_to_head if x.startswith('origin/') and not x.endswith('HEAD')), key=lambda s: len(s))[0]
         self._base_branch = base_branch
         self._merge_base = base_branch
-        print(f'Assuming base branch is {Paint.paint(self._base_branch, Paint.Color.CAPRI)}. '
+        print(f'Assuming base branch is {paint(self._base_branch, Color.CAPRI)}. '
                 'If incorrect, specify the correct base branch using --bb.')
 
 
     def check_remote_sync(self):
 
-        print(Paint.paint('\n[REMOTE]', Paint.Color.SILVER))
+        print(paint('\n[REMOTE]', Color.SILVER))
         fetch_process = run('git fetch --dry-run'.split(), capture_output=True)
         git_fetch_output = (fetch_process.stdout + fetch_process.stderr).decode('utf-8').rstrip()
         if fetch_process.returncode:
             # raise ConnectionRefusedError()
-            print(Paint.paint('Could not establish a connection to remote.', Paint.Color.RED))
+            print(paint('Could not establish a connection to remote.', Color.RED))
             self._pretty_table.add_result(Test.REMOTE_SYNC, 'N/A', 'No connection.')
         elif self._base_branch in git_fetch_output:
-            print(f'{Paint.paint("Remote is ahead", Paint.Color.RED)} of {self._base_branch}. '
+            print(f'{paint("Remote is ahead", Color.RED)} of {self._base_branch}. '
                     'Consider doing an update and rebase/merge before pushing.')
             self._pretty_table.add_result(Test.REMOTE_SYNC, 'FAIL', 'Remote ahead.')
         else:
-            print(f'{self._base_branch} is {Paint.paint("in sync with remote", Paint.Color.GREEN)}. Update not required.')
+            print(f'{self._base_branch} is {paint("in sync with remote", Color.GREEN)}. Update not required.')
             self._pretty_table.add_result(Test.REMOTE_SYNC, 'PASS', 'In sync.')
 
 
     def check_styling(self, apply: bool=False) -> None:
 
-        print(Paint.paint('\n[STYLING]', Paint.Color.SILVER))
+        print(paint('\n[STYLING]', Color.SILVER))
         diff_files = get_output(f'git diff --name-only {self._merge_base}').split('\n')
         styling_needed = False
         for file in diff_files:
@@ -662,14 +659,14 @@ class DeveloperToolbox:
                         run(f'clang-format -i {file}'.split(), cwd=self._BASE_PATH, capture_output=True)
                         print(f'Style-formatted {file}.')
                     else:
-                        print(f'{file} {Paint.paint("requires styling fixes.", Paint.Color.RED)}')
+                        print(f'{file} {paint("requires styling fixes.", Color.RED)}')
         if styling_needed:
             if apply:
                 self._pretty_table.add_result(Test.STYLE_CHECK, 'DONE', 'Styling applied.')
             else:
                 self._pretty_table.add_result(Test.STYLE_CHECK, 'FAIL', 'Needs styling.')
         else:
-            print(f'{Paint.paint("No styling changes required.", Paint.Color.GREEN)}')
+            print(f'{paint("No styling changes required.", Color.GREEN)}')
             self._pretty_table.add_result(Test.STYLE_CHECK, 'PASS', 'Styling proper.')
 
 
@@ -678,8 +675,7 @@ class DeveloperToolbox:
         if run(f'git rev-parse --verify {branch_name}'.split(), capture_output=True).returncode:
             raise NameError('Branch name or commit ID invalid.')
         if run(f'git merge-base --is-ancestor {self._actual_head} {branch_name}'.split(), capture_output=True).returncode:
-            print(Paint.paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.',
-                  Paint.Color.YELLOW))
+            print(paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.', Color.YELLOW))
         self._base_branch = branch_name
         self._merge_base = get_output(f'git merge-base {branch_name} {self._actual_head}')
 
@@ -732,7 +728,7 @@ class DeveloperToolbox:
         if skip_clean is False:
             run('make clean'.split(), cwd=invoc)
         cmd = ['make'] + list(options)
-        print(Paint.paint(f'[[ {" ".join(cmd)} ]]', Paint.Color.GRAY))
+        print(paint(f'[[ {" ".join(cmd)} ]]', Color.GRAY))
         if self._multithreading:
             cmd.append('-j')
             cmd.append('-Orecurse')
@@ -830,23 +826,23 @@ class DeveloperToolbox:
 
         if not self._builds:
             return
-        print(Paint.paint('\n[BUILDS]', Paint.Color.SILVER))
+        print(paint('\n[BUILDS]', Color.SILVER))
         # HACK: use invoc? research chdir
         chdir(self._COEX_PATH)
         # remove any duplicates
         self._builds = dict.fromkeys(self._builds).keys()
         try:
             for build in self._builds:
-                print(f'Building {Paint.paint(build.name, Paint.Color.TEAL)}...')
+                print(f'Building {paint(build.name, Color.TEAL)}...')
                 if build.name.endswith('ROM'):
                     result = self._check_rom(build)
                     if result is False:
-                        print(Paint.paint('ROM changed.', Paint.Color.RED))
+                        print(paint('ROM changed.', Color.RED))
                         self._pretty_table.add_result(build, 'FAIL', 'ROM changed.')
                         if self._break_on_failure:
                             break
                     else:
-                        print(Paint.paint('ROM unchanged.', Paint.Color.GREEN))
+                        print(paint('ROM unchanged.', Color.GREEN))
                         self._pretty_table.add_result(build, 'PASS', 'ROM unchanged.')
                 else:
                     flash_target = self._DEST_PATH / f'{build.name}_{self._short_commit_hash}.rps'
@@ -860,9 +856,9 @@ class DeveloperToolbox:
                     if results['status'] == 'PASS':
                         flash_src = results['path']
                         shcopy(flash_src, flash_target)
-                        print(Paint.paint('Compilation successful.', Paint.Color.GREEN))
+                        print(paint('Compilation successful.', Color.GREEN))
                     else:
-                        print(Paint.paint('Compilation failed.', Paint.Color.RED))
+                        print(paint('Compilation failed.', Color.RED))
                         if results['logs']['error']:
                             print(f'\nError log:\n{results["logs"]["error"]}')
                         if results['logs']['linker']:
