@@ -608,13 +608,20 @@ class DeveloperToolbox:
     def _infer_base_branch(self) -> None:
 
         print(paint('\n[BRANCH]', Color.SILVER))
+        # TODO: this logic can perhaps be improved by ignoring origin/currentbranch
         current_branch = get_output('git branch --show-current')
         log = get_output(f'git log --pretty=format:%D {self._actual_head}^')
-        refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
-        if current_branch and current_branch in refs_to_head:
-            log = get_output(f'git log --pretty=format:%D {refs_to_head[0]}^')
-            refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
-        base_branch = sorted((x for x in refs_to_head if x.startswith('origin/') and not x.endswith('HEAD')), key=lambda s: len(s))[0]
+        refs_to_head = sorted(log[log.find('origin/'):].split('\n')[0].split(', '), key=lambda s: len(s))
+        refs_to_head = [x for x in refs_to_head if x.startswith('origin/') and not x.endswith('HEAD')]
+        # look for potential base branches further if the only
+        # remote ref to the first remote head has the same name as current branch
+        if current_branch and 'origin/' + current_branch in refs_to_head:
+            if len(refs_to_head) == 1:
+                log = get_output(f'git log --pretty=format:%D {refs_to_head[0]}^')
+                refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
+            else:
+                refs_to_head.remove('origin/' + current_branch)
+        base_branch = refs_to_head[0]   # HACK
         self._base_branch = base_branch
         self._merge_base = base_branch
         print(f'Assuming base branch is {paint(self._base_branch, Color.CAPRI)}. '
@@ -688,7 +695,6 @@ class DeveloperToolbox:
 
     def check_warnings(self, build: BuildType) -> None:
 
-        print('mb', self._merge_base)
         if not self._merge_base:
             self._infer_base_branch()
         self._warning_tracker.set_db('new')
@@ -703,7 +709,6 @@ class DeveloperToolbox:
             if file in self._METADATA[build]:
                 get_output(f'git restore {self._METADATA[build][file]}')
         get_output(f'git checkout -')
-        run('git rev-parse HEAD'.split())
         self._warning_tracker.get_diff()
 
 
