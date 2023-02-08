@@ -237,10 +237,14 @@ class WarningTracker:
         for warning, count in self._new_db.items():
             if warning not in self._old_db:
                 added_db[warning] = count
+        print('Removed:')
         for warning in removed_db:
             print(warning)
+        print('Added:')
         for warning in added_db:
             print(warning)
+            if added_db[warning] > 1:
+                print(added_db[warning])
         print(f'{sum(removed_db.values())} warnings removed.')
         print(f'{sum(added_db.values())} warnings added.')
 
@@ -674,8 +678,8 @@ class DeveloperToolbox:
         if run(f'git rev-parse --verify {branch_name}'.split(), capture_output=True).returncode:
             raise NameError('Branch name or commit ID invalid.')
         if run(f'git merge-base --is-ancestor {self._actual_head} {branch_name}'.split(), capture_output=True).returncode:
-            print(Paint.paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.'),
-                  Paint.Color.YELLOW)
+            print(Paint.paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.',
+                  Paint.Color.YELLOW))
         self._base_branch = branch_name
         self._merge_base = get_output(f'git merge-base {branch_name} {self._actual_head}')
 
@@ -893,6 +897,6 @@ if __name__ == '__main__':
 # TODO: PEP8
 # TODO: replace all prints with logging, or at least file redirect
 # TODO: fix all cwd/invocs
-# TODO: add shebang
+# TODO: keep fingerprint detached?
 # TODO: name of the fw/commit
 # TODO: info about past builds to avoid recompilation
