@@ -16,7 +16,7 @@ from subprocess import run, Popen, PIPE
 from textwrap import wrap
 from time import perf_counter, sleep
 from threading import Thread, Event
-from typing import Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 from selectors import DefaultSelector, EVENT_READ
 
 
@@ -72,7 +72,7 @@ class LegacyColor(Enum):
     SOLID_YELLOW = (2, 30, 43,)
 
 
-def paint(text: str, fgcolor: Color, bgcolor: Color = None):
+def paint(text: str, fgcolor: Color, bgcolor: Color = None) -> str:
     '''
     Formats/highlights text to be printed on the console as per the ANSI coloring scheme.
     '''
@@ -98,7 +98,7 @@ class PrettyTable:
             'Result',
             'Comment',
         )
-        self._results = {}
+        self._results: Dict[Union[Test, BuildType], Tuple[str, str]] = {}
         self._width = list(map(lambda x: len(x) + 1, self._BASE_HEADERS))
 
 
@@ -125,13 +125,13 @@ class PrettyTable:
         self._width[3] = max(self._width[3], len(comment) + 1)
 
 
-    def _print_row(self, *args) -> None:
+    def _print_row(self, *args: Union[Tuple, str]) -> None:
 
         if len(args) != len(self._BASE_HEADERS):
             raise Exception() # FIXME
         widths = tuple(self._width[i] + len(paint('', *arg[1:])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
         # apply paint to arguments if they carry any
-        args = [paint(*arg) if type(arg) is tuple else arg for arg in args]
+        args = tuple(paint(*arg) if type(arg) is tuple else arg for arg in args)
 
         print(self.Char.VER_SEP.value.join([''] + [f' {arg:<{widths[i]}}' for i, arg in enumerate(args)] + ['']))
         
@@ -170,17 +170,17 @@ class PrettyTable:
 
 class ElapsedTimeThread(Thread):
     """Stoppable thread that prints the time elapsed"""
-    def __init__(self):
+    def __init__(self) -> None:
         super(ElapsedTimeThread, self).__init__()
         self._stop_event = Event()
 
-    def stop(self):
+    def stop(self) -> None:
         self._stop_event.set()
 
-    def stopped(self):
+    def stopped(self) -> bool:
         return self._stop_event.is_set()
 
-    def run(self):
+    def run(self) -> None:
         thread_start = perf_counter()
         while not self.stopped():
             print(f'\rElapsed time: {perf_counter() - thread_start:.2f}s', end='')
@@ -190,14 +190,14 @@ class ElapsedTimeThread(Thread):
 
 class WarningTracker:
 
-    def __init__(self):
+    def __init__(self) -> None:
         
         self._old_db = {}
         self._new_db = {}
-        self._active_db = None
+        self._active_db: Dict = None
 
 
-    def set_db(self, dest: str):
+    def set_db(self, dest: str) -> None:
 
         if dest == 'old':
             self._active_db = self._old_db
@@ -218,7 +218,7 @@ class WarningTracker:
             db[warning] = 1
 
 
-    def get_diff(self):
+    def get_diff(self) -> None:
 
         print(paint('\n[WARNINGS]', Color.SILVER))
         removed_db, added_db = {}, {}
@@ -265,7 +265,7 @@ class DeveloperToolbox:
         self._break_on_failure = True
         self._multithreading = True
 
-        self._builds = []
+        self._builds: List[BuildType] = []
 
         self._git_was_dirty = False
         self._actual_head = ''
@@ -273,10 +273,11 @@ class DeveloperToolbox:
         self._base_branch = ''
         self._merge_base = ''
 
-        self._warning_tracker = None
+        self._warning_tracker: WarningTracker = None
         self._pretty_table = PrettyTable()
 
-        self._METADATA = {
+        # TODO: make a class for this?
+        self._METADATA: Dict[BuildType, Any] = {
             BuildType.RS9116_A10_ROM: {
                 'args': ('--14R', '--9116R',),
                 'hidden_args': ('--14r', '--a10r', '--911614R', '--911614ROM', '--1614R', '--A10R', '--18R', '--A10ROM',),
@@ -350,7 +351,7 @@ class DeveloperToolbox:
         }
 
 
-    def _initialize(self):
+    def _initialize(self) -> None:
 
         username = PureWindowsPath(get_output('wslvar USERPROFILE')).stem
         self._DEST_PATH = Path(f'/mnt/c/Users/{username}/Downloads/builds')
@@ -628,7 +629,7 @@ class DeveloperToolbox:
                 'If incorrect, specify the correct base branch using --bb.')
 
 
-    def check_remote_sync(self):
+    def check_remote_sync(self) -> None:
 
         print(paint('\n[REMOTE]', Color.SILVER))
         fetch_process = run('git fetch --dry-run'.split(), capture_output=True)
@@ -698,10 +699,15 @@ class DeveloperToolbox:
         if not self._merge_base:
             self._infer_base_branch()
         self._warning_tracker.set_db('new')
-        self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
+        results = self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
                 get_output(f'git restore {self._METADATA[build][file]}')
+        print(results)
+        if not (results['status'] == 'PASS' or results['rerun']):
+            print('Compilation failed.')
+            print(results['logs']['error'])
+            return
         get_output(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
@@ -719,7 +725,7 @@ class DeveloperToolbox:
         self._builds.append(build)
 
 
-    def _make(self, options: Tuple[str], invoc: Path = None, skip_clean: bool = False) -> dict:
+    def _make(self, options: Tuple[str], invoc: Path = None, skip_clean: bool = False) -> Dict[str, Any]:
         
         if not invoc:
             invoc = self._COEX_PATH
@@ -802,7 +808,7 @@ class DeveloperToolbox:
         return results
 
 
-    def _make_flash(self, options: Tuple[str]) -> str:
+    def _make_flash(self, options: Tuple[str]) -> Dict[str, Any]:
 
         results = self._make(options, invoc=self._COEX_PATH)
         while results['rerun']:
@@ -870,8 +876,7 @@ class DeveloperToolbox:
                         if results['logs']['linker']:
                             # TODO: attempt to fix linker
                             print(f'\nLinker log:\n{results["logs"]["linker"]}')
-                            with open(self._COEX_PATH / 'linker_script.txt', 'r') as file:
-                                print(f'Path: {self._METADATA[build]["linker"]}')
+                            print(f'Path: {self._METADATA[build]["linker"]}')
                         if self._break_on_failure:
                             break
         finally:
@@ -880,7 +885,7 @@ class DeveloperToolbox:
             pass
 
 
-def main():
+def main() -> None:
 
     dt = DeveloperToolbox('~/rs911x')
     dt.parse_args()
@@ -902,3 +907,4 @@ if __name__ == '__main__':
 # TODO: keep fingerprint detached?
 # TODO: name of the fw/commit
 # TODO: info about past builds to avoid recompilation
+# TODO: advise against su
