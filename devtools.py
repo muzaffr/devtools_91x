@@ -259,6 +259,7 @@ class DeveloperToolbox:
 
         self._name = ''
         self._force_rebuild = False     # unused
+        self.force_clean = False
 
         # TODO: make use of pipe make output level
         self._pipe_make_output_level = 0
@@ -279,6 +280,7 @@ class DeveloperToolbox:
         # TODO: make a class for this?
         self._METADATA: Dict[BuildType, Any] = {
             BuildType.RS9116_A10_ROM: {
+                'id': 0,
                 'args': ('--14R', '--9116R',),
                 'hidden_args': ('--14r', '--a10r', '--911614R', '--911614ROM', '--1614R', '--A10R', '--18R', '--A10ROM',),
                 'options': ('chip=9118', 'rom'),
@@ -389,6 +391,12 @@ class DeveloperToolbox:
             dest='clang_format',
             action='store_true',
             help='Check for styling errors and apply the fixes.',
+        )
+        parser.add_argument(
+            '-c', '--clean',
+            dest='force_clean',
+            action='store_true',
+            help='Force make clean before compilation.',
         )
         parser.add_argument(
             '-n', '--name',
@@ -549,6 +557,8 @@ class DeveloperToolbox:
                 self.check_styling(apply=True)
             elif args.all or args.clang_check:
                 self.check_styling(apply=False)
+            if args.force_clean:
+                self.force_clean = True
             if args.all or args.g0 or args.a10r:
                 self.add_build(BuildType.RS9116_A10_ROM)
             if args.all or args.g0 or args.g2 or args.a10:
@@ -569,7 +579,6 @@ class DeveloperToolbox:
                 self.add_build(BuildType.RS9116_A11_ANT)
             if self._builds:
                 self.execute_builds()
-
         except GeneratorExit:
             pass
         finally:
@@ -726,6 +735,16 @@ class DeveloperToolbox:
         self._builds.append(build)
 
 
+    def _is_clean_needed(self) -> bool:
+
+        last_commit = findall(r'\ncommit hash: ([0-9a-f]+)')[0]
+        for file in get_output(f'git diff --name-only {last_commit}').split('\n'):
+            if not (file.endswith('.c') or file.endswith('.x') or file.endswith('.sh')):
+                clean_needed = True
+                break
+        return True and self.force_clean
+
+
     def _make(self, options: Tuple[str], invoc: Path = None, skip_clean: bool = False) -> Dict[str, Any]:
         
         if not invoc:
@@ -809,9 +828,9 @@ class DeveloperToolbox:
         return results
 
 
-    def _make_flash(self, options: Tuple[str]) -> Dict[str, Any]:
+    def _make_flash(self, options: Tuple[str], skip_clean: bool) -> Dict[str, Any]:
 
-        results = self._make(options, invoc=self._COEX_PATH)
+        results = self._make(options, invoc=self._COEX_PATH, skip_clean=skip_clean)
         while results['rerun']:
             results = self._make(options, invoc=self._COEX_PATH, skip_clean=True)
         # TODO: use exceptions instead of dict to indicate failure?
@@ -844,6 +863,7 @@ class DeveloperToolbox:
         chdir(self._COEX_PATH)
         # remove any duplicates
         self._builds = dict.fromkeys(self._builds).keys()
+        force_clean = self._is_clean_needed()
         try:
             for build in self._builds:
                 print(f'Building {paint(build.name, Color.TEAL)}...')
@@ -861,7 +881,7 @@ class DeveloperToolbox:
                     flash_target = self._DEST_PATH / f'{build.name}_{self._short_commit_hash}.rps'
                     if flash_target.is_file() and not self._force_rebuild:
                         print('Already built. Rebuilding...') # TODO: skip build
-                    results = self._make_flash(self._METADATA[build]['options'])
+                    results = self._make_flash(self._METADATA[build]['options'], force_clean)
                     for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
                         if file in self._METADATA[build]:
                             get_output(f'git restore {self._METADATA[build][file]}')
