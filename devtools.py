@@ -318,7 +318,7 @@ class DeveloperToolbox:
             },
             BuildType.RS9117_A0_ROM: {
                 'args': ('--A0R', '--9117A0R',),
-                'hidden_args': ('--a0r', '--9117A0ROM', '--17A0R', '--A0ROM',),
+                'hidden_args': ('--a0r', '--9117A0ROM', '--17A0R', '--A0ROM', '--a0rom'),
                 'options': ('chip=9117', 'rom',),
                 'rom_path': self._LMAC_PATH / 'Si9117A0_ROM_Binaries/rom_content_TA.mem',
             },
@@ -333,7 +333,7 @@ class DeveloperToolbox:
             },
             BuildType.RS9117_B0_ROM: {
                 'args': ('--B0R', '--9117B0R',),
-                'hidden_args': ('--b0r', '--9117B0ROM', '--17B0R', '--B0ROM',),
+                'hidden_args': ('--b0r', '--9117B0ROM', '--17B0R', '--B0ROM', '--b0rom',),
                 'options': ('chip=9117', 'rom_version=B0', 'rom',),
                 'rom_path': self._LMAC_PATH / 'Si9117B0_ROM_Binaries/rom_content_TA.mem',
             },
@@ -704,10 +704,10 @@ class DeveloperToolbox:
             if file in self._METADATA[build]:
                 get_output(f'git restore {self._METADATA[build][file]}')
         print(results)
-        if not (results['status'] == 'PASS' or results['rerun']):
-            print('Compilation failed.')
-            print(results['logs']['error'])
-            return
+        # if not (results['status'] == 'PASS' or results['rerun']):
+        #     print('Compilation failed.')
+        #     print(results['logs']['error'])
+        #     return
         get_output(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
@@ -906,5 +906,7 @@ if __name__ == '__main__':
 # TODO: fix all cwd/invocs
 # TODO: keep fingerprint detached?
 # TODO: name of the fw/commit
-# TODO: info about past builds to avoid recompilation
+# TODO: store info about past builds to avoid recompilation
 # TODO: advise against su
+# TODO: config editor, config in editor
+# TODO: info in comments: skipped, copied, path?, ROM changed
