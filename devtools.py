@@ -575,7 +575,9 @@ class DeveloperToolbox:
         finally:
             self._git_imprint_wipe()
             self._pretty_table.print_all()
-            get_output(f'cp {self._LOG_FILE} {self._COEX_PATH / "logdt.txt"}')
+            shcopy(self._LOG_FILE, self._BASE_PATH / 'logdt.txt')
+            (self._COEX_PATH / 'logdt.txt').unlink()
+            (self._COEX_PATH / 'logdt.txt').symlink_to(self._BASE_PATH / 'logdt.txt')
 
 
     def _git_imprint(self) -> None:
