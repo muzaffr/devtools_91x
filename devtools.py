@@ -337,7 +337,6 @@ class DeveloperToolbox:
                 'options': ('chip=9117', 'rom_version=B0', 'rom',),
                 'rom_path': self._LMAC_PATH / 'Si9117B0_ROM_Binaries/rom_content_TA.mem',
             },
-
             BuildType.RS9117_B0: {
                 'args': ('-B', '--B0', '--17B0',),
                 'hidden_args': ('-9', '-b', '--9117B0', '--b0'),
@@ -380,13 +379,13 @@ class DeveloperToolbox:
             help='Check if the base branch is in sync with remote (origin).',
         )
         parser.add_argument(
-            '-c', '--clang-check',
+            '--cs', '--check-styling',
             dest='clang_check',
             action='store_true',
             help='Check for styling errors. This does NOT apply the fixes.',
         )
         parser.add_argument(
-            '-f', '--clang-format',
+            '-s', '--apply-styling',
             dest='clang_format',
             action='store_true',
             help='Check for styling errors and apply the fixes.',
@@ -910,3 +909,5 @@ if __name__ == '__main__':
 # TODO: advise against su
 # TODO: config editor, config in editor
 # TODO: info in comments: skipped, copied, path?, ROM changed
+# TODO: git info exclude logdt, should be in git root since it will be independent for every repo
+# TODO: intelligent make clean
