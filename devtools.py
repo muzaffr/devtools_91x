@@ -4,23 +4,25 @@
 Developer Tools for rs911x.
 """
 
-from argparse import ArgumentParser, SUPPRESS
-from datetime import datetime
-from enum import Enum
-from filecmp import cmp as fcmp
-from os import chdir, remove as osremove
-from pathlib import Path, PureWindowsPath
-from re import findall, sub
-from shutil import copy as shcopy
+from argparse   import ArgumentParser, SUPPRESS
+from datetime   import datetime
+from enum       import Enum
+from filecmp    import cmp as fcmp
+from os         import chdir, remove as osremove
+from pathlib    import Path, PureWindowsPath
+from re         import findall, sub
+from selectors  import DefaultSelector, EVENT_READ
+from shutil     import copy as shcopy
 from subprocess import run, Popen, PIPE
-from textwrap import wrap
-from time import perf_counter, sleep
-from threading import Thread, Event
-from typing import Any, Dict, List, Tuple, Union
-from selectors import DefaultSelector, EVENT_READ
+from textwrap   import wrap
+from time       import perf_counter, sleep
+from threading  import Thread, Event
+from typing     import Any, Dict, List, Tuple, Union
 
 
-get_output = lambda x: run(x.split(), capture_output=True).stdout.decode('utf8').rstrip()
+def get_output(cmd) -> str:
+
+    return run(cmd.split(), capture_output=True).stdout.decode('utf8').rstrip()
 
 
 class Test(Enum):
@@ -576,6 +578,7 @@ class DeveloperToolbox:
             self._git_imprint_wipe()
             self._pretty_table.print_all()
             shcopy(self._LOG_FILE, self._BASE_PATH / 'logdt.txt')
+            print(paint('\n[SAFE EXIT]', Color.SILVER))
             (self._COEX_PATH / 'logdt.txt').unlink()
             (self._COEX_PATH / 'logdt.txt').symlink_to(self._BASE_PATH / 'logdt.txt')
 
