@@ -537,10 +537,12 @@ class DeveloperToolbox:
                 self.set_name(args.name)
             if 'wc' in clargs:
                 self._warning_tracker = WarningTracker()
-                if args.wc in ('9117', '7', 'A0'):
+                if args.wc in ('9117', '7', 'A0', 'A'):
                     self.check_warnings(BuildType.RS9117_A0)
                 elif args.wc in ('B', 'B0'):
                     self.check_warnings(BuildType.RS9117_B0)
+                elif args.wc in ('6', '4'):
+                    self.check_warnings(BuildType.RS9116_A10)
                 raise GeneratorExit()   # HACK: used to wipe imprint
             if args.all or args.clang_check or args.clang_format or args.remote:
                 if not self._base_branch:
@@ -707,11 +709,10 @@ class DeveloperToolbox:
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
                 get_output(f'git restore {self._METADATA[build][file]}')
-        print(results)
-        # if not (results['status'] == 'PASS' or results['rerun']):
-        #     print('Compilation failed.')
-        #     print(results['logs']['error'])
-        #     return
+        if not (results['status'] == 'PASS' or results['rerun']):
+            print('Compilation failed.')
+            print(results['logs']['error'])
+            return
         get_output(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
@@ -916,3 +917,4 @@ if __name__ == '__main__':
 # TODO: info in comments: skipped, copied, path?, ROM changed
 # TODO: git info exclude logdt, should be in git root since it will be independent for every repo
 # TODO: intelligent make clean
+# TODO: capture line numbers in warnings
