@@ -607,7 +607,7 @@ class DeveloperToolbox:
         self._actual_head = self.get_cmd_stdout('git rev-parse HEAD')
         if self.get_cmd_rc('git diff --quiet'):
             print(f'{paint("Uncommitted changes found.", Color.ORANGE)}\nLeaving fingerprint...')
-            self.get_cmd_stdout('git commit -am fingerprint')
+            self.get_cmd_rc('git commit -am fingerprint')
             self._git_was_dirty = True
         short_commit_hash = self.get_cmd_stdout('git rev-parse --short HEAD')
         print(f'On commit {paint(short_commit_hash, Color.CAPRI)}')
@@ -624,7 +624,7 @@ class DeveloperToolbox:
 
         if self._git_was_dirty:
             print(paint('\n[GIT]', Color.SILVER))
-            self.get_cmd_stdout('git reset HEAD^')
+            self.get_cmd_rc('git reset HEAD^')
             print('Wiped fingerprint.')
 
 
@@ -686,7 +686,7 @@ class DeveloperToolbox:
                 if self.get_cmd_rc(f'clang-format --Werror --dry-run {file}'):
                     styling_needed = True
                     if apply:
-                        self.get_cmd_stdout(f'clang-format -i {file}')
+                        self.get_cmd_rc(f'clang-format -i {file}')
                         print(f'Style-formatted {file}.')
                     else:
                         print(f'{file} {paint("requires styling fixes.", Color.RED)}')
@@ -722,20 +722,16 @@ class DeveloperToolbox:
             self._infer_base_branch()
         self._warning_tracker.set_db('new')
         results = self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
-        for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
-            if file in self._METADATA[build]:
-                self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}')
+        self._clean_auto_files(self._METADATA[build])
         if not (results['status'] == 'PASS' or results['rerun']):
             print('Compilation failed.')
             print(results['logs']['error'])
             return
-        self.get_cmd_stdout(f'git checkout {self._merge_base}')
+        self.get_cmd_rc(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
-        for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
-            if file in self._METADATA[build]:
-                self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}')
-        self.get_cmd_stdout(f'git checkout -')
+        self._clean_auto_files(self._METADATA[build])
+        self.get_cmd_rc(f'git checkout -')
         self._warning_tracker.get_diff()
 
 
@@ -829,6 +825,12 @@ class DeveloperToolbox:
         return results
 
 
+    def _clean_auto_files(self, build):
+        for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
+            if file in build:
+                self.get_cmd_rc(f'git restore {build[file]}')
+
+
     def _make_flash(self, options: Tuple[str]) -> Dict[str, Any]:
 
         results = self._make(options, invoc=self._COEX_PATH)
@@ -880,9 +882,7 @@ class DeveloperToolbox:
                     if flash_target.is_file() and not self._force_rebuild:
                         print('Already built. Rebuilding...') # TODO: skip build
                     results = self._make_flash(self._METADATA[build]['options'])
-                    for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
-                        if file in self._METADATA[build]:
-                            self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}', cwd=self._METADATA[build]['invoc'])
+                    self._clean_auto_files(self._METADATA[build])
                     self._pretty_table.add_result(build, results['status'], f'Size: {results["size"]}')
                     if results['status'] == 'PASS':
                         flash_src = results['path']
