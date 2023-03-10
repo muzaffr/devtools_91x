@@ -8,7 +8,7 @@ from argparse   import ArgumentParser, SUPPRESS
 from datetime   import datetime
 from enum       import Enum
 from filecmp    import cmp as fcmp
-from os         import chdir, remove as osremove
+from os         import remove as osremove
 from pathlib    import Path, PureWindowsPath
 from re         import findall, sub
 from selectors  import DefaultSelector, EVENT_READ
@@ -18,11 +18,6 @@ from textwrap   import wrap
 from time       import perf_counter, sleep
 from threading  import Thread, Event
 from typing     import Any, Dict, List, Tuple, Union
-
-
-def get_output(cmd) -> str:
-
-    return run(cmd.split(), capture_output=True).stdout.decode('utf8').rstrip()
 
 
 class Test(Enum):
@@ -250,14 +245,17 @@ class WarningTracker:
 
 class DeveloperToolbox:
 
-    def __init__(self, path: str) -> None:
+    def __init__(self) -> None:
 
-        self._BASE_PATH = Path(path).expanduser()
+        p = run('git rev-parse --show-toplevel'.split(), capture_output=True)
+        if p.returncode != 0:
+            raise FileNotFoundError('Not a git repository')
+        self._BASE_PATH = Path(p.stdout.decode('utf8').rstrip())
         self._LMAC_PATH = self._BASE_PATH / 'LMAC'
         self._COEX_PATH = self._LMAC_PATH  / 'ebuild/coex'
         self._RELEASE_PATH = self._LMAC_PATH / 'erelease'
 
-        chdir(self._BASE_PATH)
+        self._cwd = self._BASE_PATH
 
         self._name = ''
         self._force_rebuild = False     # unused
@@ -284,6 +282,7 @@ class DeveloperToolbox:
                 'args': ('--14R', '--9116R',),
                 'hidden_args': ('--14r', '--a10r', '--911614R', '--911614ROM', '--1614R', '--A10R', '--18R', '--A10ROM',),
                 'options': ('chip=9118', 'rom'),
+                'invoc': self._COEX_PATH,
                 'rom_path': self._LMAC_PATH / 'ROM_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9116_A10: {
@@ -299,6 +298,7 @@ class DeveloperToolbox:
                 'args': ('--15R', '--91162R',),
                 'hidden_args': ('--15r', '--a11r', '--911615R', '--911615ROM', '--1615R', '--A11R', '--182R', '--A11ROM',),
                 'options': ('chip=9118', 'rev=2', 'rom'),
+                'invoc': self._COEX_PATH,
                 'rom_path': self._LMAC_PATH / 'ROM2_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9116_A11: {
@@ -320,6 +320,7 @@ class DeveloperToolbox:
             },
             BuildType.RS9117_A0_ROM: {
                 'args': ('--A0R', '--9117A0R',),
+                'invoc': self._COEX_PATH,
                 'hidden_args': ('--a0r', '--9117A0ROM', '--17A0R', '--A0ROM', '--a0rom'),
                 'options': ('chip=9117', 'rom',),
                 'rom_path': self._LMAC_PATH / 'Si9117A0_ROM_Binaries/rom_content_TA.mem',
@@ -335,6 +336,7 @@ class DeveloperToolbox:
             },
             BuildType.RS9117_B0_ROM: {
                 'args': ('--B0R', '--9117B0R',),
+                'invoc': self._COEX_PATH,
                 'hidden_args': ('--b0r', '--9117B0ROM', '--17B0R', '--B0ROM', '--b0rom',),
                 'options': ('chip=9117', 'rom_version=B0', 'rom',),
                 'rom_path': self._LMAC_PATH / 'Si9117B0_ROM_Binaries/rom_content_TA.mem',
@@ -352,9 +354,23 @@ class DeveloperToolbox:
         }
 
 
+    def get_cmd_stdout(self, cmd: str, cwd=None) -> str:
+
+        if cwd is None:
+            cwd = self._cwd
+        return run(cmd.split(), capture_output=True, cwd=cwd).stdout.decode('utf8').rstrip()
+
+
+    def get_cmd_rc(self, cmd: str, cwd=None) -> int:
+
+        if cwd is None:
+            cwd = self._cwd
+        return run(cmd.split(), capture_output=True, cwd=cwd).returncode
+
+
     def _initialize(self) -> None:
 
-        username = PureWindowsPath(get_output('wslvar USERPROFILE')).stem
+        username = PureWindowsPath(self.get_cmd_stdout('wslvar USERPROFILE')).stem
         self._DEST_PATH = Path(f'/mnt/c/Users/{username}/Downloads/builds')
         self._DEST_PATH.mkdir(parents=True, exist_ok=True)
         self._LOG_FILE = self._DEST_PATH / f'{datetime.now().strftime("%y%m%d-%H%M%S")}.txt'
@@ -588,14 +604,14 @@ class DeveloperToolbox:
     def _git_imprint(self) -> None:
 
         print(paint('\n[GIT]', Color.SILVER))
-        self._actual_head = get_output('git rev-parse HEAD')
-        if run('git diff --quiet'.split(), cwd=self._BASE_PATH).returncode:
+        self._actual_head = self.get_cmd_stdout('git rev-parse HEAD')
+        if self.get_cmd_rc('git diff --quiet'):
             print(f'{paint("Uncommitted changes found.", Color.ORANGE)}\nLeaving fingerprint...')
-            get_output('git commit -am fingerprint')
+            self.get_cmd_stdout('git commit -am fingerprint')
             self._git_was_dirty = True
-        short_commit_hash = get_output('git rev-parse --short HEAD')
+        short_commit_hash = self.get_cmd_stdout('git rev-parse --short HEAD')
         print(f'On commit {paint(short_commit_hash, Color.CAPRI)}')
-        commit_hash = get_output('git rev-parse HEAD')
+        commit_hash = self.get_cmd_stdout('git rev-parse HEAD')
         self._short_commit_hash = short_commit_hash
         with open(self._LOG_FILE, 'a') as logfile:
             logfile.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]\n')
@@ -608,7 +624,7 @@ class DeveloperToolbox:
 
         if self._git_was_dirty:
             print(paint('\n[GIT]', Color.SILVER))
-            get_output('git reset HEAD^')
+            self.get_cmd_stdout('git reset HEAD^')
             print('Wiped fingerprint.')
 
 
@@ -616,15 +632,15 @@ class DeveloperToolbox:
 
         print(paint('\n[BRANCH]', Color.SILVER))
         # TODO: this logic can perhaps be improved by ignoring origin/currentbranch
-        current_branch = get_output('git branch --show-current')
-        log = get_output(f'git log --pretty=format:%D {self._actual_head}^')
+        current_branch = self.get_cmd_stdout('git branch --show-current')
+        log = self.get_cmd_stdout(f'git log --pretty=format:%D {self._actual_head}^')
         refs_to_head = sorted(log[log.find('origin/'):].split('\n')[0].split(', '), key=lambda s: len(s))
         refs_to_head = [x for x in refs_to_head if x.startswith('origin/') and not x.endswith('HEAD')]
         # look for potential base branches further if the only
         # remote ref to the first remote head has the same name as current branch
         if current_branch and 'origin/' + current_branch in refs_to_head:
             if len(refs_to_head) == 1:
-                log = get_output(f'git log --pretty=format:%D {refs_to_head[0]}^')
+                log = self.get_cmd_stdout(f'git log --pretty=format:%D {refs_to_head[0]}^')
                 refs_to_head = log[log.find('origin/'):].split('\n')[0].split(', ')
             else:
                 refs_to_head.remove('origin/' + current_branch)
@@ -638,7 +654,7 @@ class DeveloperToolbox:
     def check_remote_sync(self) -> None:
 
         print(paint('\n[REMOTE]', Color.SILVER))
-        fetch_process = run('git fetch --dry-run'.split(), capture_output=True)
+        fetch_process = self.get_cmd_rc('git fetch --dry-run')
         git_fetch_output = (fetch_process.stdout + fetch_process.stderr).decode('utf-8').rstrip()
         if fetch_process.returncode:
             # raise ConnectionRefusedError()
@@ -656,7 +672,7 @@ class DeveloperToolbox:
     def check_styling(self, apply: bool=False) -> None:
 
         print(paint('\n[STYLING]', Color.SILVER))
-        diff_files = get_output(f'git diff --name-only {self._merge_base}').split('\n')
+        diff_files = self.get_cmd_stdout(f'git diff --name-only {self._merge_base}').split('\n')
         styling_needed = False
         for file in diff_files:
             if not(file.endswith('.c') or file.endswith('.h')):
@@ -667,10 +683,10 @@ class DeveloperToolbox:
                     flag = False
                     break
             if flag:
-                if run(f'clang-format --Werror --dry-run {file}'.split(), cwd=self._BASE_PATH, capture_output=True).returncode:
+                if self.get_cmd_rc(f'clang-format --Werror --dry-run {file}'):
                     styling_needed = True
                     if apply:
-                        run(f'clang-format -i {file}'.split(), cwd=self._BASE_PATH, capture_output=True)
+                        self.get_cmd_stdout(f'clang-format -i {file}')
                         print(f'Style-formatted {file}.')
                     else:
                         print(f'{file} {paint("requires styling fixes.", Color.RED)}')
@@ -686,13 +702,13 @@ class DeveloperToolbox:
 
     def set_base_branch(self, branch_name: str) -> None:
 
-        if run(f'git rev-parse --verify {branch_name}'.split(), capture_output=True).returncode:
+        if self.get_cmd_rc(f'git rev-parse --verify {branch_name}'):
             raise NameError('Branch name or commit ID invalid.')
-        if run(f'git merge-base --is-ancestor {self._actual_head} {branch_name}'.split(), capture_output=True).returncode \
-            and run(f'git merge-base --is-ancestor {branch_name} {self._actual_head}'.split(), capture_output=True).returncode: # HACK
+        if self.get_cmd_rc(f'git merge-base --is-ancestor {self._actual_head} {branch_name}') \
+            and self.get_cmd_rc(f'git merge-base --is-ancestor {branch_name} {self._actual_head}'): # HACK
             print(paint('Warning: base branch has diverged from the current branch. Consider doing a rebase/merge.', Color.YELLOW))
         self._base_branch = branch_name
-        self._merge_base = get_output(f'git merge-base {branch_name} {self._actual_head}')
+        self._merge_base = self.get_cmd_stdout(f'git merge-base {branch_name} {self._actual_head}')
 
 
     def set_name(self, name: str) -> None:
@@ -708,18 +724,18 @@ class DeveloperToolbox:
         results = self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
-                get_output(f'git restore {self._METADATA[build][file]}')
+                self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}')
         if not (results['status'] == 'PASS' or results['rerun']):
             print('Compilation failed.')
             print(results['logs']['error'])
             return
-        get_output(f'git checkout {self._merge_base}')
+        self.get_cmd_stdout(f'git checkout {self._merge_base}')
         self._warning_tracker.set_db('old')
         self._make(self._METADATA[build]['options'], invoc=self._COEX_PATH)
         for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
             if file in self._METADATA[build]:
-                get_output(f'git restore {self._METADATA[build][file]}')
-        get_output(f'git checkout -')
+                self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}')
+        self.get_cmd_stdout(f'git checkout -')
         self._warning_tracker.get_diff()
 
 
@@ -743,7 +759,7 @@ class DeveloperToolbox:
             'logs': {},
         }
         if skip_clean is False:
-            run('make clean'.split(), cwd=invoc)
+            self.get_cmd_rc('make clean', cwd=invoc)
         cmd = ['make'] + list(options)
         print(paint(f'[[ {" ".join(cmd)} ]]', Color.GRAY))
         if self._multithreading:
@@ -844,8 +860,6 @@ class DeveloperToolbox:
         if not self._builds:
             return
         print(paint('\n[BUILDS]', Color.SILVER))
-        # HACK: use invoc? research chdir
-        chdir(self._COEX_PATH)
         # remove any duplicates
         self._builds = dict.fromkeys(self._builds).keys()
         try:
@@ -868,7 +882,7 @@ class DeveloperToolbox:
                     results = self._make_flash(self._METADATA[build]['options'])
                     for file in ('linker', 'convobj', 'bootdesc', 'garbage'):
                         if file in self._METADATA[build]:
-                            get_output(f'git restore {self._METADATA[build][file]}')
+                            self.get_cmd_stdout(f'git restore {self._METADATA[build][file]}', cwd=self._METADATA[build]['invoc'])
                     self._pretty_table.add_result(build, results['status'], f'Size: {results["size"]}')
                     if results['status'] == 'PASS':
                         flash_src = results['path']
@@ -892,8 +906,7 @@ class DeveloperToolbox:
 
 def main() -> None:
 
-    dt = DeveloperToolbox('~/rs911x')
-    dt.parse_args()
+    DeveloperToolbox().parse_args()
 
 
 if __name__ == '__main__':
@@ -909,7 +922,7 @@ if __name__ == '__main__':
 # TODO: PEP8
 # TODO: replace all prints with logging, or at least file redirect
 # TODO: fix all cwd/invocs
-# TODO: keep fingerprint detached?
+# TODO: keep fingerprint detached? handle staged files in fingerprinting
 # TODO: name of the fw/commit
 # TODO: store info about past builds to avoid recompilation
 # TODO: advise against su
