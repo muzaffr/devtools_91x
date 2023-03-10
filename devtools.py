@@ -581,7 +581,7 @@ class DeveloperToolbox:
             self._pretty_table.print_all()
             shcopy(self._LOG_FILE, self._BASE_PATH / 'logdt.txt')
             print(paint('\n[SAFE EXIT]', Color.SILVER))
-            (self._COEX_PATH / 'logdt.txt').unlink()
+            (self._COEX_PATH / 'logdt.txt').unlink(missing_ok=True)
             (self._COEX_PATH / 'logdt.txt').symlink_to(self._BASE_PATH / 'logdt.txt')
 
 
