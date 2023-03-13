@@ -16,7 +16,6 @@ from shutil     import copy as shcopy
 from subprocess import run, Popen, PIPE
 from textwrap   import wrap
 from time       import perf_counter, sleep
-from threading  import Thread, Event
 from typing     import Any, Dict, List, Tuple, Union
 
 
@@ -55,6 +54,7 @@ class Color(Enum):
     ORANGE      = 'ff7f00'
     CAPRI       = '00bfff'
     TEAL        = '7fffff'
+    CREAM       = 'cfaf8f'
 
 
 class LegacyColor(Enum):
@@ -165,24 +165,48 @@ class PrettyTable:
         )
 
 
-class ElapsedTimeThread(Thread):
-    """Stoppable thread that prints the time elapsed"""
-    def __init__(self) -> None:
-        super(ElapsedTimeThread, self).__init__()
-        self._stop_event = Event()
+class ProgressBar:
 
-    def stop(self) -> None:
-        self._stop_event.set()
+    def __init__(self, name: str, max_value: float) -> None:
+        self._name = name
+        self._max_value = max_value
+        self._LENGTH = 48
+        self._START_TIME = perf_counter()
+        self._LEAST_COUNT = 8
+        self.current_value = 0
 
-    def stopped(self) -> bool:
-        return self._stop_event.is_set()
+    def update(self, current_value: float) -> None:
+        if current_value < 1 or current_value > self._max_value:
+            return
+        self.current_value = current_value
+        chars = (' ',) + tuple(map(chr, range(9615, 9615 - self._LEAST_COUNT, -1)))
+        v = chr(9474)
+        ratio = current_value / self._max_value
+        frac = ratio * self._LENGTH
+        whole = int(frac)
+        part = int((frac % 1) * self._LEAST_COUNT)
+        elapsed_time = perf_counter() - self._START_TIME
+        eta = (1 - ratio) * elapsed_time / ratio
+        print(
+            paint(
+                f'\r  {self._name} {v}'
+                + chars[-1] * whole
+                + chars[part] * int(whole < self._LENGTH)
+                + (self._LENGTH - whole - 1) * ' '
+                + f'{v} {int(100 * ratio)}% '
+                + f'{v} {elapsed_time:.1f}s ',
+                # + f'{v} ETA: {eta:.1f}s ',
+                Color.GRAY,
+            ),
+            end='',
+        )
 
-    def run(self) -> None:
-        thread_start = perf_counter()
-        while not self.stopped():
-            print(f'\rElapsed time: {perf_counter() - thread_start:.2f}s', end='')
-            # include a delay here so the thread doesn't uselessly hog the CPU
-            sleep(0.07)
+    def update_relative(self, delta: float) -> None:
+        self.update(self.current_value + delta)
+
+    def finalize(self) -> None:
+        self.update(self._max_value)
+        print()
 
 
 class WarningTracker:
@@ -757,17 +781,17 @@ class DeveloperToolbox:
         if skip_clean is False:
             self.get_cmd_rc('make clean', cwd=invoc)
         cmd = ['make'] + list(options)
-        print(paint(f'[[ {" ".join(cmd)} ]]', Color.GRAY))
         if self._multithreading:
             cmd.append('-j')
             cmd.append('-Orecurse')
+        cmd.append('--trace')
+        targets = str(run(cmd + ['--dry-run'], capture_output=True).stdout).count('<builtin>: update target')
+        pb = ProgressBar(f'{" ".join(options)}', targets)
         p = Popen(cmd, cwd=invoc, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         sel = DefaultSelector()
         sel.register(p.stdout, EVENT_READ)
         sel.register(p.stderr, EVENT_READ)
-        elapsed_time_thread = ElapsedTimeThread()
-        elapsed_time_thread.daemon = True
-        elapsed_time_thread.start()
+
         compiler_log = ''
         categorized_logs = {
             'linker': '',
@@ -788,6 +812,8 @@ class DeveloperToolbox:
                         results['size'] = int(findall(r'\d+', line)[0])
                     elif 'Please run make again!' in line:
                         results['rerun'] = True
+                    elif '<builtin>: update target' in line:
+                        pb.update_relative(1)
                 else:
                     compiler_log += line
                     # TODO: improve this if clause
@@ -811,8 +837,8 @@ class DeveloperToolbox:
                     else:
                         context += line
 
-        elapsed_time_thread.stop()
-        elapsed_time_thread.join()
+        if p.returncode == 0:
+            pb.finalize()
         print()
 
         with open(self._LOG_FILE, 'a') as logfile:
@@ -931,3 +957,4 @@ if __name__ == '__main__':
 # TODO: git info exclude logdt, should be in git root since it will be independent for every repo
 # TODO: intelligent make clean
 # TODO: capture line numbers in warnings
+# TODO: copy flash option
