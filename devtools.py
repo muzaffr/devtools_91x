@@ -262,7 +262,7 @@ class DeveloperToolbox:
 
         # TODO: make use of pipe make output level
         self._pipe_make_output_level = 0
-        self._break_on_failure = True
+        self._break_on_failure = False
         self._multithreading = True
 
         self._builds: List[BuildType] = []
