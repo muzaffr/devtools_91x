@@ -785,7 +785,7 @@ class DeveloperToolbox:
             cmd.append('-j')
             cmd.append('-Orecurse')
         cmd.append('--trace')
-        targets = str(run(cmd + ['--dry-run'], capture_output=True).stdout).count('<builtin>: update target')
+        targets = str(run(cmd + ['--dry-run'], capture_output=True, cwd=invoc).stdout).count('<builtin>: update target')
         pb = ProgressBar(f'{" ".join(options)}', targets)
         p = Popen(cmd, cwd=invoc, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         sel = DefaultSelector()
