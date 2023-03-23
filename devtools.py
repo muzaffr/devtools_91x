@@ -678,7 +678,7 @@ class DeveloperToolbox:
     def check_remote_sync(self) -> None:
 
         print(paint('\n[REMOTE]', Color.SILVER))
-        fetch_process = self.get_cmd_rc('git fetch --dry-run')
+        fetch_process = run('git fetch --dry-run'.split(), capture_output=True, cwd=self._BASE_PATH)
         git_fetch_output = (fetch_process.stdout + fetch_process.stderr).decode('utf-8').rstrip()
         if fetch_process.returncode:
             # raise ConnectionRefusedError()
