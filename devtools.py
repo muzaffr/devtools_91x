@@ -37,6 +37,7 @@ class BuildType(Enum):
     RS9117_B0       = '9117 B0'
     RS9116_A11_ANT  = '9116 1.5 Garmin'
     RS9117_A1       = '9117 A1'
+    RS9117_A0_TINY  = '9117 A0 Tiny'
 
 
 class Color(Enum):
@@ -367,12 +368,21 @@ class DeveloperToolbox:
             },
             BuildType.RS9117_B0: {
                 'args': ('-B', '--B0', '--17B0',),
-                'hidden_args': ('-9', '-b', '--9117B0', '--b0'),
+                'hidden_args': ('-9', '-b', '--9117B0', '--b0',),
                 'options': ('chip=9117', 'rom_version=B0',),
                 'invoc': self._COEX_PATH,
                 'linker': self._LMAC_PATH / 'common/chip_dep/9117B0/cpu/linker_script_icache_qspi_all_coex_9117_wc_rom2.x',
                 'convobj': self._LMAC_PATH / 'common/chip_dep/9117B0/cpu/convobj_coex_qspi_threadx_9117_rom2.sh',
                 'bootdesc': self._LMAC_PATH / 'common/chip_dep/9117B0/cpu/boot_desc_9117_rom2.c',
+            },
+            BuildType.RS9117_A0_TINY: {
+                'args': ('--A0T', '--A0SA',),
+                'hidden_args': ('--a0t', '--a0sa',),
+                'options': ('chip=9117', 'sta_alone=1',),
+                'invoc': self._COEX_PATH,
+                'linker': self._LMAC_PATH / 'common/chip_dep/RS9117/cpu/linker_script_icache_qspi_all_coex_9117_wc_rom2_sta_alone.x',
+                'convobj': self._LMAC_PATH / 'common/chip_dep/RS9117/cpu/convobj_coex_qspi_threadx_9117_rom2_sta_alone.sh',
+                'bootdesc': self._LMAC_PATH / 'common/chip_dep/RS9117/cpu/boot_desc_9117_rom2_sta_alone.c',
             },
             # TODO: increase coverage
         }
@@ -472,6 +482,18 @@ class DeveloperToolbox:
         parser.add_argument(
             *self._METADATA[BuildType.RS9117_A0]['hidden_args'],
             dest='a0',
+            action='store_true',
+            help=SUPPRESS,
+        )
+        parser.add_argument(
+            *self._METADATA[BuildType.RS9117_A0_TINY]['args'],
+            dest='a0t',
+            action='store_true',
+            help='Compile 9117 A0 Tiny NCP firmware and copy it to Windows.',
+        )
+        parser.add_argument(
+            *self._METADATA[BuildType.RS9117_A0_TINY]['hidden_args'],
+            dest='a0t',
             action='store_true',
             help=SUPPRESS,
         )
@@ -609,6 +631,8 @@ class DeveloperToolbox:
                 self.add_build(BuildType.RS9117_B0_ROM)
             if args.all or args.g0 or args.g2 or args.b0:
                 self.add_build(BuildType.RS9117_B0)
+            if args.all or args.g0 or args.g2 or args.a0t:
+                self.add_build(BuildType.RS9117_A0_TINY)
             if args.all or args.g0:
                 self.add_build(BuildType.RS9116_A11_ANT)
             if self._builds:
@@ -958,3 +982,4 @@ if __name__ == '__main__':
 # TODO: intelligent make clean
 # TODO: capture line numbers in warnings
 # TODO: copy flash option
+# TODO: use tree hash (git cat-file -p HEAD)
