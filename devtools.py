@@ -6,7 +6,7 @@ Developer Tools for rs911x.
 
 from argparse   import ArgumentParser, SUPPRESS
 from datetime   import datetime
-from enum       import Enum
+from enum       import Enum, auto as enumauto
 from filecmp    import cmp as fcmp
 from os         import remove as osremove, getuid
 from pathlib    import Path, PureWindowsPath
@@ -58,6 +58,15 @@ class Color(Enum):
     CREAM       = 'cfaf8f'
 
 
+class Result(Enum):
+
+    NONE = enumauto()
+    PASS = enumauto()
+    FAIL = enumauto()
+    DIFF = enumauto()
+    DONE = enumauto()
+
+
 class LegacyColor(Enum):
 
     RED          = (1, 31, 40,)
@@ -68,6 +77,21 @@ class LegacyColor(Enum):
     SOLID_RED    = (1, 37, 41,)
     SOLID_GREEN  = (2, 30, 42,)
     SOLID_YELLOW = (2, 30, 43,)
+
+
+class DataModel:
+
+    class BuildData:
+
+        def __init__(self, id: int) -> None:
+            self.id = id
+
+    def __init__(self) -> None:
+        self.commit_to_tree: Dict[int, List[int]] = {}
+        self.tree_to_commit: Dict[int, int] = {}
+        pass
+
+
 
 
 def paint(text: str, fgcolor: Color, bgcolor: Color = None) -> str:
@@ -410,10 +434,13 @@ class DeveloperToolbox:
     def _initialize(self) -> None:
 
         username = PureWindowsPath(self.get_cmd_stdout('wslvar USERPROFILE')).stem
-        self._DEST_PATH = Path(f'/mnt/c/Users/{username}/Downloads/builds')
+        self._WIN_PATH = Path(f'/mnt/c/Users/{username}/Documents/celebi')
+        self._DEST_PATH = self._WIN_PATH
         self._DEST_PATH.mkdir(parents=True, exist_ok=True)
-        self._LOG_FILE = self._DEST_PATH / f'{datetime.now().strftime("%y%m%d-%H%M%S")}.txt'
-        self._LOG_FILE.touch()
+        (self._DEST_PATH / 'logs').mkdir(exist_ok=True)
+        self._DB_FILE = self._DEST_PATH / 'data'
+        if not self._DB_FILE.exists():
+            self._DB_FILE.touch()
 
 
     def parse_args(self) -> None:
@@ -594,6 +621,7 @@ class DeveloperToolbox:
 
         args = parser.parse_args()
 
+        # If no meaningful argument is given, print help and exit.
         clargs = vars(args).copy()
         clargs.pop('base_branch')
         if not any(x for x in clargs.values()):
