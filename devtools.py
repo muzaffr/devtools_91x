@@ -558,6 +558,12 @@ class DeveloperToolbox:
             help=SUPPRESS,
         )
         parser.add_argument(
+            '--rom', '--ROM',
+            dest='rom',
+            action='store_true',
+            help='Check for ROM changes (all ROMs).',
+        )
+        parser.add_argument(
             '--G0', '--g0',
             dest='g0',
             action='store_true',
@@ -615,19 +621,19 @@ class DeveloperToolbox:
                 self.check_styling(apply=True)
             elif args.all or args.clang_check:
                 self.check_styling(apply=False)
-            if args.all or args.g0 or args.a10r:
+            if args.all or args.g0 or args.a10r or args.rom:
                 self.add_build(BuildType.RS9116_A10_ROM)
             if args.all or args.g0 or args.g2 or args.a10:
                 self.add_build(BuildType.RS9116_A10)
-            if args.all or args.g0 or args.a11r:
+            if args.all or args.g0 or args.a11r or args.rom:
                 self.add_build(BuildType.RS9116_A11_ROM)
             if args.all or args.g0 or args.g2 or args.a11:
                 self.add_build(BuildType.RS9116_A11)
-            if args.all or args.g0 or args.a0r:
+            if args.all or args.g0 or args.a0r or args.rom:
                 self.add_build(BuildType.RS9117_A0_ROM)
             if args.all or args.g0 or args.g2 or args.a0:
                 self.add_build(BuildType.RS9117_A0)
-            if args.all or args.g0 or args.b0r:
+            if args.all or args.g0 or args.b0r or args.rom:
                 self.add_build(BuildType.RS9117_B0_ROM)
             if args.all or args.g0 or args.g2 or args.b0:
                 self.add_build(BuildType.RS9117_B0)
