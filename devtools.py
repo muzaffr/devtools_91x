@@ -308,7 +308,7 @@ class DeveloperToolbox:
                 'hidden_args': ('--14r', '--a10r', '--911614R', '--911614ROM', '--1614R', '--A10R', '--18R', '--A10ROM',),
                 'options': ('chip=9118', 'rom'),
                 'invoc': self._COEX_PATH,
-                'rom_path': self._LMAC_PATH / 'ROM_Binaries/rom_content_TA.mem',
+                'rom_path': self._LMAC_PATH / 'rom_binaries/ROM_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9116_A10: {
                 'args': ('-4', '-6', '--14', '--9116',),
@@ -324,7 +324,7 @@ class DeveloperToolbox:
                 'hidden_args': ('--15r', '--a11r', '--911615R', '--911615ROM', '--1615R', '--A11R', '--182R', '--A11ROM',),
                 'options': ('chip=9118', 'rev=2', 'rom'),
                 'invoc': self._COEX_PATH,
-                'rom_path': self._LMAC_PATH / 'ROM2_Binaries/rom_content_TA.mem',
+                'rom_path': self._LMAC_PATH / 'rom_binaries/ROM2_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9116_A11: {
                 'args': ('-5', '--15', '--91162',),
@@ -348,7 +348,7 @@ class DeveloperToolbox:
                 'invoc': self._COEX_PATH,
                 'hidden_args': ('--a0r', '--9117A0ROM', '--17A0R', '--A0ROM', '--a0rom'),
                 'options': ('chip=9117', 'rom',),
-                'rom_path': self._LMAC_PATH / 'Si9117A0_ROM_Binaries/rom_content_TA.mem',
+                'rom_path': self._LMAC_PATH / 'rom_binaries/Si9117A0_ROM_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9117_A0: {
                 'args': ('-7', '-A', '--17', '--9117',),
@@ -364,7 +364,7 @@ class DeveloperToolbox:
                 'invoc': self._COEX_PATH,
                 'hidden_args': ('--b0r', '--9117B0ROM', '--17B0R', '--B0ROM', '--b0rom',),
                 'options': ('chip=9117', 'rom_version=B0', 'rom',),
-                'rom_path': self._LMAC_PATH / 'Si9117B0_ROM_Binaries/rom_content_TA.mem',
+                'rom_path': self._LMAC_PATH / 'rom_binaries/Si9117B0_ROM_Binaries/rom_content_TA.mem',
             },
             BuildType.RS9117_B0: {
                 'args': ('-B', '--B0', '--17B0',),
