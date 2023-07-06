@@ -981,6 +981,7 @@ if __name__ == '__main__':
         # FIXME: does not work?
         print('Input terminated.')
 
+
 # TODO: PEP8
 # TODO: replace all prints with logging, or at least file redirect
 # TODO: fix all cwd/invocs
@@ -994,3 +995,21 @@ if __name__ == '__main__':
 # TODO: capture line numbers in warnings
 # TODO: copy flash option
 # TODO: use tree hash (git cat-file -p HEAD)
+# TODO: fix --bb with wa
+# TODO: refactor argument parsing
+
+
+'''
+config options
+config_editor:
+store_logs:
+force_make_clean:
+smart_make_clean:
+force_rebuild:
+pipe_make_output_level:
+break_on_failure:
+multithreading:
+base_branch:
+log_file_path: (multiple paths?)
+garbage collection params (age, count, ?)
+'''
