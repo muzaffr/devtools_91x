@@ -8,7 +8,7 @@ from argparse   import ArgumentParser, SUPPRESS
 from datetime   import datetime
 from enum       import Enum
 from filecmp    import cmp as fcmp
-from os         import remove as osremove
+from os         import remove as osremove, getuid
 from pathlib    import Path, PureWindowsPath
 from re         import findall, sub
 from selectors  import DefaultSelector, EVENT_READ
@@ -85,6 +85,11 @@ def paint(text: str, fgcolor: Color, bgcolor: Color = None) -> str:
     return colored_text
     # return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
 
+
+def check_sudo() -> None:
+    '''Check if current user has superuser privileges.'''
+    if not getuid():
+        raise PermissionError('Run the script with unelevated privileges.')
 
 class PrettyTable:
 
@@ -338,7 +343,7 @@ class DeveloperToolbox:
             BuildType.RS9116_A11_ANT: {
                 'options': ('chip=9118', 'rev=2', 'ant=1',),
                 'invoc': self._COEX_PATH,
-                'linker': self._COEX_PATH / 'linker_script_icache_qspi_all_coex_9118_wc_rom2_ant.x',
+                'linker': self._BASE_PATH / 'ant_stack/linker_script_icache_qspi_all_coex_9118_wc_rom2.x',
                 'convobj': self._COEX_PATH / 'convobj_coex_qspi_threadx_9118_ant_rom2.sh',
                 'bootdesc': self._LMAC_PATH / 'ebuild/wlan/boot_desc_rom2.c',
                 'garbage': self._BASE_PATH / 'ant_stack/ant_vnd_bin',
@@ -586,7 +591,7 @@ class DeveloperToolbox:
         warnings_parser = subparsers.add_parser('warnings', aliases=['wa'])
         warnings_parser.add_argument('wc', metavar='chip')
         warnings_parser.add_argument('--thorough', action='store_true')
-        
+
         args = parser.parse_args()
 
         clargs = vars(args).copy()
@@ -815,7 +820,7 @@ class DeveloperToolbox:
             cmd.append('-j')
             cmd.append('-Orecurse')
         cmd.append('--trace')
-        targets = str(run(cmd + ['--dry-run'], capture_output=True, cwd=invoc).stdout).count('<builtin>: update target')
+        targets = run(cmd + ['--dry-run'], capture_output=True, cwd=invoc).stdout.count(b'<builtin>: update target')
         pb = ProgressBar(f'{" ".join(options)}', targets)
         p = Popen(cmd, cwd=invoc, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         sel = DefaultSelector()
@@ -966,6 +971,7 @@ def main() -> None:
 
 
 if __name__ == '__main__':
+    check_sudo()
     try:
         main()
     except KeyboardInterrupt:
@@ -981,7 +987,6 @@ if __name__ == '__main__':
 # TODO: keep fingerprint detached? handle staged files in fingerprinting
 # TODO: name of the fw/commit
 # TODO: store info about past builds to avoid recompilation
-# TODO: advise against su
 # TODO: config editor, config in editor
 # TODO: info in comments: skipped, copied, path?, ROM changed
 # TODO: git info exclude logdt, should be in git root since it will be independent for every repo
