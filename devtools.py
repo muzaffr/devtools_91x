@@ -2,6 +2,9 @@
 
 """
 Developer Tools for rs911x.
+
+Celebi came from the future by crossing over time.
+It is thought that so long as Celebi appears, a bright and shining future awaits us.
 """
 
 from argparse   import ArgumentParser, SUPPRESS
@@ -15,7 +18,7 @@ from selectors  import DefaultSelector, EVENT_READ
 from shutil     import copy as shcopy
 from subprocess import run, Popen, PIPE
 from textwrap   import wrap
-from time       import perf_counter, sleep
+from time       import perf_counter, time_ns
 from typing     import Any, Dict, List, Tuple, Union
 
 
@@ -79,17 +82,29 @@ class LegacyColor(Enum):
     SOLID_YELLOW = (2, 30, 43,)
 
 
-class DataModel:
+class Data:
 
     class BuildData:
 
-        def __init__(self, id: int) -> None:
-            self.id = id
+        def __init__(self: int) -> None:
+            self.id
+            self.tests
+            self.firmwares
+            self.time
+            self.pc
+            self.path
+            self.commit_hash
+            self.tree_hash
+            self.name
+
 
     def __init__(self) -> None:
         self.commit_to_tree: Dict[int, List[int]] = {}
         self.tree_to_commit: Dict[int, int] = {}
-        pass
+        self.build_data_list: List[self.BuildData] = []
+        self.current_build_data: self.BuildData
+    
+        
 
 
 
@@ -1001,7 +1016,10 @@ def main() -> None:
 if __name__ == '__main__':
     check_sudo()
     try:
-        main()
+        # main()
+        from pickle import dumps
+        print(dumps(set([Result.PASS])))
+        pass
     except KeyboardInterrupt:
         # TODO: improve handler?
         print('\nProgram terminated.')
@@ -1033,6 +1051,10 @@ if __name__ == '__main__':
 '''
 config options
 config_editor:
+copy OneBox: (bool)
+    ip address
+    username
+    password?
 store_logs:
 force_make_clean:
 smart_make_clean:
@@ -1041,6 +1063,19 @@ pipe_make_output_level:
 break_on_failure:
 multithreading:
 base_branch:
+windows_output_path:
 log_file_path: (multiple paths?)
 garbage collection params (age, count, ?)
+
+file structure
+src/
+    config
+    progress_bar
+    warning_tracker
+    pretty
+    types
+    database
+    build_manager
+    main
+config/
 '''
