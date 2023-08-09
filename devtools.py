@@ -6,8 +6,10 @@ Developer Tools for rs911x.
 
 from argparse   import ArgumentParser, SUPPRESS
 from datetime   import datetime
+from ctypes     import Structure, c_uint8, c_uint16, c_uint32
 from enum       import Enum
 from filecmp    import cmp as fcmp
+from importlib  import metadata
 from os         import remove as osremove, getuid
 from pathlib    import Path, PureWindowsPath
 from re         import findall, sub
@@ -271,6 +273,27 @@ class WarningTracker:
                 print(added_db[warning])
         print(f'{sum(removed_db.values())} warnings removed.')
         print(f'{sum(added_db.values())} warnings added.')
+
+
+class FWImageMetadataWriter:
+
+    class FWImageMetadata(Structure):
+        _fields_ = [
+            ('control_flags',   c_uint16),
+            ('sha_type',        c_uint16),
+            ('magic_no',        c_uint32),
+            ('image_size',      c_uint32),
+            # ('fw_version'),
+            ('flash_location',  c_uint32),
+            ('crc',             c_uint32),
+            ('mic',             c_uint32 * 4),
+            ('counter',         c_uint32),
+            # ('fw_version_ext'),
+            ('reserved',        c_uint16 * 4),
+        ]
+
+    def __init__(self) -> None:
+        assert metadata.version('cryptography') >= '38.0.1'
 
 
 class DeveloperToolbox:
