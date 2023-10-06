@@ -1,39 +1,16 @@
 #!/usr/bin/python3
 
-"""
+'''
 Developer Tools for rs911x.
 
 Celebi came from the future by crossing over time.
 It is thought that so long as Celebi appears, a bright and shining future awaits us.
-"""
+'''
 
 from os import getuid
-from typing import Dict, List
 
 from chore_manager import ChoreManager
 
-class Data:
-
-    class BuildData:
-
-        def __init__(self: int) -> None:
-            self.id
-            self.tests
-            self.firmwares
-            self.time
-            self.pc
-            self.path
-            self.commit_hash
-            self.tree_hash
-            self.name
-
-
-    def __init__(self) -> None:
-        self.commit_to_tree: Dict[int, List[int]] = {}
-        self.tree_to_commit: Dict[int, int] = {}
-        self.build_data_list: List[self.BuildData] = []
-        self.current_build_data: self.BuildData
-    
 
 def check_sudo() -> None:
     '''Check if current user has superuser privileges.'''
@@ -81,6 +58,7 @@ if __name__ == '__main__':
 # TODO: detect terminal width, change progress bar
 # TODO: multiline comments support
 # TODO: abstract [STATUS] messages
+# TODO: add ROM change checker
 
 
 '''
@@ -108,7 +86,7 @@ src/
     progress_bar
     warning_tracker
     pretty
-    types
+    base_types
     database
     chore_manager
     main
