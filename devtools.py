@@ -818,7 +818,7 @@ class DeveloperToolbox:
         cmd = ['make'] + list(options)
         if self._multithreading:
             cmd.append('-j')
-            cmd.append('-Orecurse')
+            cmd.append('-Otarget')
         cmd.append('--trace')
         targets = run(cmd + ['--dry-run'], capture_output=True, cwd=invoc).stdout.count(b'<builtin>: update target')
         pb = ProgressBar(f'{" ".join(options)}', targets)
@@ -997,6 +997,9 @@ if __name__ == '__main__':
 # TODO: use tree hash (git cat-file -p HEAD)
 # TODO: fix --bb with wa
 # TODO: refactor argument parsing
+# TODO: dynamic linker: remove garbage files?
+# TODO: git checkout not reflected during warnings
+# TODO: detect terminal width, change progress bar
 
 
 '''
