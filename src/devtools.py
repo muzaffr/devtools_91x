@@ -9,50 +9,20 @@ It is thought that so long as Celebi appears, a bright and shining future awaits
 
 from argparse   import ArgumentParser, SUPPRESS
 from datetime   import datetime
-from enum       import Enum, auto as enumauto
 from filecmp    import cmp as fcmp
 from os         import remove as osremove, getuid
 from pathlib    import Path, PureWindowsPath
-from re         import findall, sub
+from re         import findall
 from selectors  import DefaultSelector, EVENT_READ
 from shutil     import copy as shcopy
 from subprocess import run, Popen, PIPE
 from time       import perf_counter, time_ns
 from typing     import Any, Dict, List, Tuple, Union
 
-from pretty import Color, paint
+from base_types import Test, BuildType, Result
+from pretty import Color, PrettyTable, paint
 from progress_bar import ProgressBar
-
-
-class Test(Enum):
-
-    STYLE_CHECK = 'Style Check'
-    REMOTE_SYNC = 'Remote Sync'
-
-
-class BuildType(Enum):
-
-    RS9116_A10_ROM  = '9116 1.4 ROM'
-    RS9116_A10      = '9116 1.4'
-    RS9116_A11_ROM  = '9116 1.5 ROM'
-    RS9116_A11      = '9116 1.5'
-    RS9117_A0_ROM   = '9117 A0 ROM'
-    RS9117_A0       = '9117 A0'
-    RS9117_B0_ROM   = '9117 B0 ROM'
-    RS9117_B0       = '9117 B0'
-    RS9116_A11_ANT  = '9116 1.5 Garmin'
-    RS9117_A1       = '9117 A1'
-    RS9117_A0_TINY  = '9117 A0 Tiny'
-
-
-
-class Result(Enum):
-
-    NONE = enumauto()
-    PASS = enumauto()
-    FAIL = enumauto()
-    DIFF = enumauto()
-    DONE = enumauto()
+from warning_tracker import WarningTracker
 
 
 class Data:
@@ -82,143 +52,6 @@ def check_sudo() -> None:
     '''Check if current user has superuser privileges.'''
     if not getuid():
         raise PermissionError('Run the script with unelevated privileges.')
-
-class PrettyTable:
-
-    def __init__(self) -> None:
-
-        self._BASE_HEADERS = (
-            '#',
-            'Name',
-            'Result',
-            'Comment',
-        )
-        self._results: Dict[Union[Test, BuildType], Tuple[str, str]] = {}
-        self._width = list(map(lambda x: len(x) + 1, self._BASE_HEADERS))
-
-
-    class Char(Enum):
-
-        TOP_LEFT    = chr(9554)
-        TOP_MID     = chr(9572)
-        TOP_RIGHT   = chr(9557)
-        MID_LEFT    = chr(9566)
-        MID_MID     = chr(9578)
-        MID_RIGHT   = chr(9569)
-        BOT_LEFT    = chr(9560)
-        BOT_MID     = chr(9575)
-        BOT_RIGHT   = chr(9563)
-        VER_SEP     = chr(9474)
-        HOR_SEP     = chr(9552)
-
-
-    def add_result(self, test: Union[BuildType, Test], result: str, comment: str) -> None:
-
-        self._results[test] = (result, comment)
-        self._width[1] = max(self._width[1], len(test.value) + 1)
-        self._width[2] = max(self._width[2], len(result) + 1)
-        self._width[3] = max(self._width[3], len(comment) + 1)
-
-
-    def _print_row(self, *args: Union[Tuple, str]) -> None:
-
-        if len(args) != len(self._BASE_HEADERS):
-            raise Exception() # FIXME
-        widths = tuple(self._width[i] + len(paint('', *arg[1:])) if type(arg) is tuple else self._width[i] for i, arg in enumerate(args))
-        # apply paint to arguments if they carry any
-        args = tuple(paint(*arg) if type(arg) is tuple else arg for arg in args)
-
-        print(self.Char.VER_SEP.value.join([''] + [f' {arg:<{widths[i]}}' for i, arg in enumerate(args)] + ['']))
-        
-
-    def print_all(self) -> None:
-
-        if not self._results:
-            return
-
-        print(paint('\n[SUMMARY]', Color.SILVER))    # FIXME: probably not the right place
-        self._width[0] = len(str(len(self._results))) + 1
-        print(
-            self.Char.TOP_LEFT.value +
-            self.Char.TOP_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
-            self.Char.TOP_RIGHT.value
-        )
-        self._print_row(*self._BASE_HEADERS)
-        print(
-            self.Char.MID_LEFT.value +
-            self.Char.MID_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
-            self.Char.MID_RIGHT.value
-        )
-        for idx, (build_type, (result, comment)) in enumerate(self._results.items()):
-            result_color = {
-                'FAIL': (Color.WHITE, Color.RED),
-                'PASS': (Color.BLACK, Color.GREEN),
-                'N/A' : (Color.BLACK, Color.YELLOW),
-            }.get(result.upper(), (Color.BLACK, Color.YELLOW))
-            self._print_row(str(idx+1), (build_type.value, Color.CAPRI), (result, *result_color), comment)
-        print(
-            self.Char.BOT_LEFT.value +
-            self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
-            self.Char.BOT_RIGHT.value
-        )
-
-
-class WarningTracker:
-
-    def __init__(self) -> None:
-        
-        self._old_db = {}
-        self._new_db = {}
-        self._active_db: Dict = None
-
-
-    def set_db(self, dest: str) -> None:
-
-        if dest == 'old':
-            self._active_db = self._old_db
-        elif dest == 'new':
-            self._active_db = self._new_db
-        else:
-            raise NameError('Invalid name') # HACK
-
-    
-    def add(self, warning: str) -> None:
-
-        db = self._active_db
-        warning = sub(r':[0-9]+:', ':#:', warning)
-        warning = sub(r':[0-9]+:', ':#:', warning)
-        if warning in db:
-            db[warning] += 1
-        else:
-            db[warning] = 1
-
-
-    def get_diff(self) -> None:
-
-        print(paint('\n[WARNINGS]', Color.SILVER))
-        removed_db, added_db = {}, {}
-        for warning, count in self._old_db.items():
-            if warning in self._new_db:
-                count_diff = self._new_db[warning] - count
-            else:
-                count_diff = -count
-            if count_diff < 0:
-                removed_db[warning] = -count_diff
-            elif count_diff > 0:
-                added_db[warning] = count_diff
-        for warning, count in self._new_db.items():
-            if warning not in self._old_db:
-                added_db[warning] = count
-        print('Removed:')
-        for warning in removed_db:
-            print(warning)
-        print('Added:')
-        for warning in added_db:
-            print(warning)
-            if added_db[warning] > 1:
-                print(added_db[warning])
-        print(f'{sum(removed_db.values())} warnings removed.')
-        print(f'{sum(added_db.values())} warnings added.')
 
 
 class DeveloperToolbox:
@@ -956,6 +789,7 @@ if __name__ == '__main__':
 # TODO: git checkout not reflected during warnings
 # TODO: detect terminal width, change progress bar
 # TODO: multiline comments support
+# TODO: abstract [STATUS] messages
 
 
 '''
