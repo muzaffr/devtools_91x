@@ -17,9 +17,11 @@ from re         import findall, sub
 from selectors  import DefaultSelector, EVENT_READ
 from shutil     import copy as shcopy
 from subprocess import run, Popen, PIPE
-from textwrap   import wrap
 from time       import perf_counter, time_ns
 from typing     import Any, Dict, List, Tuple, Union
+
+from pretty import Color, paint
+from progress_bar import ProgressBar
 
 
 class Test(Enum):
@@ -43,23 +45,6 @@ class BuildType(Enum):
     RS9117_A0_TINY  = '9117 A0 Tiny'
 
 
-class Color(Enum):
-
-    RED         = 'ff0000'
-    GREEN       = '00ff00'
-    BLUE        = '0000ff'
-    WHITE       = 'ffffff'
-    BLACK       = '000000'
-    CYAN        = '00ffff'
-    MAGENTA     = 'ff00ff'
-    YELLOW      = 'ffff00'
-    GRAY        = '6f6f6f'
-    SILVER      = '9f9f9f'
-    ORANGE      = 'ff7f00'
-    CAPRI       = '00bfff'
-    TEAL        = '7fffff'
-    CREAM       = 'cfaf8f'
-
 
 class Result(Enum):
 
@@ -68,18 +53,6 @@ class Result(Enum):
     FAIL = enumauto()
     DIFF = enumauto()
     DONE = enumauto()
-
-
-class LegacyColor(Enum):
-
-    RED          = (1, 31, 40,)
-    GREEN        = (1, 32, 40,)
-    YELLOW       = (1, 33, 40,)
-    CYAN         = (1, 36, 40,)
-    PURPLE       = (1, 35, 40,)
-    SOLID_RED    = (1, 37, 41,)
-    SOLID_GREEN  = (2, 30, 42,)
-    SOLID_YELLOW = (2, 30, 43,)
 
 
 class Data:
@@ -104,26 +77,6 @@ class Data:
         self.build_data_list: List[self.BuildData] = []
         self.current_build_data: self.BuildData
     
-        
-
-
-
-
-def paint(text: str, fgcolor: Color, bgcolor: Color = None) -> str:
-    '''
-    Formats/highlights text to be printed on the console as per the ANSI coloring scheme.
-    '''
-    colored_text = '\033[38;2;'
-    hex_to_seq = lambda y: ';'.join(map(lambda x: str(int(x, 16)), wrap(y.value, 2))) + 'm'
-    colored_text += hex_to_seq(fgcolor)
-    if bgcolor:
-        colored_text += '\033[48;2;'
-        colored_text += hex_to_seq(bgcolor)
-    colored_text += text
-    colored_text += '\033[0m'
-    return colored_text
-    # return '\033[{}m{}\033[0m'.format(';'.join(map(str, color.value)), text)
-
 
 def check_sudo() -> None:
     '''Check if current user has superuser privileges.'''
@@ -208,50 +161,6 @@ class PrettyTable:
             self.Char.BOT_MID.value.join((w+1) * self.Char.HOR_SEP.value for w in self._width) + 
             self.Char.BOT_RIGHT.value
         )
-
-
-class ProgressBar:
-
-    def __init__(self, name: str, max_value: float) -> None:
-        self._name = name
-        self._max_value = max_value
-        self._LENGTH = 48
-        self._START_TIME = perf_counter()
-        self._LEAST_COUNT = 8
-        self.current_value = 0
-
-    def update(self, current_value: float) -> None:
-        if current_value < 1 or current_value > self._max_value:
-            return
-        self.current_value = current_value
-        chars = (' ',) + tuple(map(chr, range(9615, 9615 - self._LEAST_COUNT, -1)))
-        v = chr(9474)
-        ratio = current_value / self._max_value
-        frac = ratio * self._LENGTH
-        whole = int(frac)
-        part = int((frac % 1) * self._LEAST_COUNT)
-        elapsed_time = perf_counter() - self._START_TIME
-        eta = (1 - ratio) * elapsed_time / ratio
-        print(
-            paint(
-                f'\r  {self._name} {v}'
-                + chars[-1] * whole
-                + chars[part] * int(whole < self._LENGTH)
-                + (self._LENGTH - whole - 1) * ' '
-                + f'{v} {int(100 * ratio)}% '
-                + f'{v} {elapsed_time:.1f}s ',
-                # + f'{v} ETA: {eta:.1f}s ',
-                Color.GRAY,
-            ),
-            end='',
-        )
-
-    def update_relative(self, delta: float) -> None:
-        self.update(self.current_value + delta)
-
-    def finalize(self) -> None:
-        self.update(self._max_value)
-        print()
 
 
 class WarningTracker:
@@ -697,7 +606,7 @@ class DeveloperToolbox:
         finally:
             self._git_imprint_wipe()
             self._pretty_table.print_all()
-            shcopy(self._LOG_FILE, self._BASE_PATH / 'logdt.txt')
+            # shcopy(self._LOG_FILE, self._BASE_PATH / 'logdt.txt')
             print(paint('\n[SAFE EXIT]', Color.SILVER))
             (self._COEX_PATH / 'logdt.txt').unlink(missing_ok=True)
             (self._COEX_PATH / 'logdt.txt').symlink_to(self._BASE_PATH / 'logdt.txt')
@@ -715,11 +624,11 @@ class DeveloperToolbox:
         print(f'On commit {paint(short_commit_hash, Color.CAPRI)}')
         commit_hash = self.get_cmd_stdout('git rev-parse HEAD')
         self._short_commit_hash = short_commit_hash
-        with open(self._LOG_FILE, 'a') as logfile:
-            logfile.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]\n')
-            logfile.write(f'invocation path: {self._BASE_PATH}\n')
-            logfile.write(f'commit hash: {commit_hash}\n')
-            # logfile.write(f'lca hash: {parent_hash}\n')
+        # with open(self._LOG_FILE, 'a') as logfile:
+        #     logfile.write(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]\n')
+        #     logfile.write(f'invocation path: {self._BASE_PATH}\n')
+        #     logfile.write(f'commit hash: {commit_hash}\n')
+        #     logfile.write(f'lca hash: {parent_hash}\n')
 
 
     def _git_imprint_wipe(self) -> None:
@@ -919,10 +828,10 @@ class DeveloperToolbox:
             pb.finalize()
         print()
 
-        with open(self._LOG_FILE, 'a') as logfile:
-            logfile.write(f'\n[[{" ".join(cmd)}]]\n')
-            logfile.write(compiler_log)
-        
+        # with open(self._LOG_FILE, 'a') as logfile:
+        #     logfile.write(f'\n[[{" ".join(cmd)}]]\n')
+        #     logfile.write(compiler_log)
+
         # TODO: write stdout as well
 
         results['logs'] = categorized_logs
@@ -1016,9 +925,9 @@ def main() -> None:
 if __name__ == '__main__':
     check_sudo()
     try:
-        # main()
-        from pickle import dumps
-        print(dumps(set([Result.PASS])))
+        main()
+        # from pickle import dumps
+        # print(dumps(set([Result.PASS])))
         pass
     except KeyboardInterrupt:
         # TODO: improve handler?
@@ -1046,6 +955,7 @@ if __name__ == '__main__':
 # TODO: dynamic linker: remove garbage files?
 # TODO: git checkout not reflected during warnings
 # TODO: detect terminal width, change progress bar
+# TODO: multiline comments support
 
 
 '''
