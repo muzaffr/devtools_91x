@@ -409,7 +409,7 @@ class DeveloperToolbox:
 
     def _initialize(self) -> None:
 
-        username = PureWindowsPath(self.get_cmd_stdout('wslvar USERPROFILE')).stem
+        username = PureWindowsPath(run(['cmd.exe', '/C echo %USERPROFILE%'], capture_output=True).stdout.decode('utf8').rstrip(' "\r\n')).stem
         self._DEST_PATH = Path(f'/mnt/c/Users/{username}/Downloads/builds')
         self._DEST_PATH.mkdir(parents=True, exist_ok=True)
         self._LOG_FILE = self._DEST_PATH / f'{datetime.now().strftime("%y%m%d-%H%M%S")}.txt'
@@ -818,7 +818,7 @@ class DeveloperToolbox:
         cmd = ['make'] + list(options)
         if self._multithreading:
             cmd.append('-j')
-            cmd.append('-Orecurse')
+            cmd.append('-Otarget')
         cmd.append('--trace')
         targets = run(cmd + ['--dry-run'], capture_output=True, cwd=invoc).stdout.count(b'<builtin>: update target')
         pb = ProgressBar(f'{" ".join(options)}', targets)
