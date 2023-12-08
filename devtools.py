@@ -997,7 +997,7 @@ if __name__ == '__main__':
 # TODO: use tree hash (git cat-file -p HEAD)
 # TODO: fix --bb with wa
 # TODO: refactor argument parsing
-
+# TODO: wipe fingerprint before compilation
 
 '''
 config options
