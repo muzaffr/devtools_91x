@@ -38,6 +38,7 @@ class BuildType(Enum):
     RS9116_A11_ANT  = '9116 1.5 Garmin'
     RS9117_A1       = '9117 A1'
     RS9117_A0_TINY  = '9117 A0 Tiny'
+    RS9117_B0_ISO   = '9117 B0 Iso'
 
 
 class Color(Enum):
@@ -268,7 +269,7 @@ class WarningTracker:
         for warning in added_db:
             print(warning)
             if added_db[warning] > 1:
-                print(added_db[warning])
+                print(f'^ ({added_db[warning]} times)\n')
         print(f'{sum(removed_db.values())} warnings removed.')
         print(f'{sum(added_db.values())} warnings added.')
 
@@ -289,6 +290,8 @@ class DeveloperToolbox:
 
         self._name = ''
         self._force_rebuild = False     # unused
+
+        self._username = ''
 
         # TODO: make use of pipe make output level
         self._pipe_make_output_level = 0
@@ -389,6 +392,12 @@ class DeveloperToolbox:
                 'convobj': self._LMAC_PATH / 'common/chip_dep/RS9117/cpu/convobj_coex_qspi_threadx_9117_rom2_sta_alone.sh',
                 'bootdesc': self._LMAC_PATH / 'common/chip_dep/RS9117/cpu/boot_desc_9117_rom2_sta_alone.c',
             },
+            BuildType.RS9117_B0_ISO: {
+                'args': ('-I', '--B0ISO',),
+                'hidden_args': ('--b0i', '--b0iso',),
+                'options': ('chip=9117', 'rom_version=B0',),
+                'invoc': self._COEX_PATH,
+            }
             # TODO: increase coverage
         }
 
@@ -409,8 +418,8 @@ class DeveloperToolbox:
 
     def _initialize(self) -> None:
 
-        username = PureWindowsPath(run(['cmd.exe', '/C echo %USERPROFILE%'], capture_output=True).stdout.decode('utf8').rstrip(' "\r\n')).stem
-        self._DEST_PATH = Path(f'/mnt/c/Users/{username}/Downloads/builds')
+        self._username = PureWindowsPath(run(['cmd.exe', '/C echo %USERPROFILE%'], capture_output=True).stdout.decode('utf8').rstrip(' "\r\n')).stem
+        self._DEST_PATH = Path(f'/mnt/c/Users/{self._username}/Downloads/builds')
         self._DEST_PATH.mkdir(parents=True, exist_ok=True)
         self._LOG_FILE = self._DEST_PATH / f'{datetime.now().strftime("%y%m%d-%H%M%S")}.txt'
         self._LOG_FILE.touch()
@@ -511,6 +520,18 @@ class DeveloperToolbox:
         parser.add_argument(
             *self._METADATA[BuildType.RS9117_B0]['hidden_args'],
             dest='b0',
+            action='store_true',
+            help=SUPPRESS
+        )
+        parser.add_argument(
+            *self._METADATA[BuildType.RS9117_B0_ISO]['args'],
+            dest='b0i',
+            action='store_true',
+            help='Compile 9117 B0 ISO NCP firmware and copy it to Windows.',
+        )
+        parser.add_argument(
+            *self._METADATA[BuildType.RS9117_B0_ISO]['hidden_args'],
+            dest='b0i',
             action='store_true',
             help=SUPPRESS
         )
@@ -626,6 +647,10 @@ class DeveloperToolbox:
                 self.check_styling(apply=True)
             elif args.all or args.clang_check:
                 self.check_styling(apply=False)
+            if args.all or args.g0 or args.g2 or args.b0:
+                self.add_build(BuildType.RS9117_B0)
+            if args.all or args.g0 or args.g2 or args.b0i:
+                self.add_build(BuildType.RS9117_B0_ISO)
             if args.all or args.g0 or args.a10r or args.rom:
                 self.add_build(BuildType.RS9116_A10_ROM)
             if args.all or args.g0 or args.g2 or args.a10:
@@ -640,8 +665,6 @@ class DeveloperToolbox:
                 self.add_build(BuildType.RS9117_A0)
             if args.all or args.g0 or args.b0r or args.rom:
                 self.add_build(BuildType.RS9117_B0_ROM)
-            if args.all or args.g0 or args.g2 or args.b0:
-                self.add_build(BuildType.RS9117_B0)
             if args.all or args.g0 or args.g2 or args.a0t:
                 self.add_build(BuildType.RS9117_A0_TINY)
             if args.all or args.g0:
@@ -834,17 +857,21 @@ class DeveloperToolbox:
             'warning': '',
         }
         context = ''
-        ok = True
-        while ok:
-            for key, _ in sel.select():
+        empty_count = 0
+        # FIXME: what even is 4096
+        while empty_count < 4096:
+            for key, _ in sel.select(timeout=2):
                 line = key.fileobj.readline()
                 if not line:
-                    ok = False
-                    break
+                    empty_count += 1
+                else:
+                    empty_count = 0
                 if key.fileobj is p.stdout:
                     if 'Size of flash image' in line:
                         results['status'] = 'PASS'
                         results['size'] = int(findall(r'\d+', line)[0])
+                    elif 'A11 compilation done' in line:
+                        results['status'] = 'PASS'
                     elif 'Please run make again!' in line:
                         results['rerun'] = True
                     elif '<builtin>: update target' in line:
@@ -881,6 +908,7 @@ class DeveloperToolbox:
             logfile.write(compiler_log)
         
         # TODO: write stdout as well
+        # print(compiler_log)
 
         results['logs'] = categorized_logs
         return results
@@ -918,6 +946,85 @@ class DeveloperToolbox:
         return gen_rom_path.is_file() and fcmp(self._METADATA[chip]['rom_path'], gen_rom_path)
 
 
+    def _add_to_section_length(self, file, section, sz):
+
+        new_src = ''
+        with open(file) as f:
+            flag = True
+            for line in f.readlines():
+                if section in line and flag:
+                    modified_line = line.replace('\n', f' + {sz}\n')
+                    new_src += modified_line
+                    # print(f'Linker was:\t{line}\nLinker is:\t{modified_line}')
+                    flag = False
+                else:
+                    new_src += line
+        with open(file, 'w') as f:
+            f.write(new_src)
+
+
+    def _add_to_section_origin(self, file, section, sz):
+
+        new_src = ''
+        with open(file) as f:
+            for line in f.readlines():
+                if findall(fr'{section}.*,\s+l', line):
+                    modified_line = sub(fr'({section}.*),\s+l', fr'\1 + {sz}, l', line)
+                    # print(f'Linker was:\t{line}\nLinker is:\t{modified_line}')
+                    new_src += modified_line
+                else:
+                    new_src += line
+        with open(file, 'w') as f:
+            f.write(new_src)
+
+
+    def _build_isolation(self) -> None:
+
+        # TODO: add hash check for files
+        src_path = Path(f'/mnt/c/Users/{self._username}/Downloads/isoln')
+        tgt_path = self._LMAC_PATH / 'platforms/devices/siwx917b0/cpu'
+        for file in src_path.iterdir():
+            shcopy(file, tgt_path / file.name)
+
+        print(paint('\nCompiling ROM...', Color.CYAN))
+        rom_results = self._make(self._METADATA[BuildType.RS9117_B0_ROM]['options'], invoc=self._COEX_PATH)
+        if rom_results['logs']['linker']:
+            sz = findall(r'region `rom_image_rodata\' overflowed by (\d+) bytes', rom_results['logs']['linker'])[0]
+            print(paint('Fixing ROM linker...', Color.YELLOW))
+            self._add_to_section_length(tgt_path / 'linker_rom2.x', 'rom_image_rodata', sz)
+            self._add_to_section_length(tgt_path / 'linker_rom_debug2.x', 'rom_image_rodata', sz)
+            self._add_to_section_length(tgt_path / 'linker_script_icache_qspi_all_coex_9117_wc_rom2.x', 'rom_image2', sz)
+            rom_results = self._make(self._METADATA[BuildType.RS9117_B0_ROM]['options'], invoc=self._COEX_PATH)
+        if rom_results['status'] == 'PASS':
+            print(paint('ROM compilation successful.', Color.GREEN))
+        else:
+            if rom_results['logs']['error']:
+                print(f'\nError log:\n{rom_results["logs"]["error"]}')
+
+        print(paint('\nCompiling Flash...', Color.CYAN))
+        flash_results = self._make(self._METADATA[BuildType.RS9117_B0]['options'], invoc=self._COEX_PATH)
+        if flash_results['logs']['linker']:
+            sz = findall(r'region `qspi_memory\' overflowed by (\d+) bytes', flash_results['logs']['linker'])[0]
+            print(paint('Fixing flash linker...', Color.YELLOW))
+            self._add_to_section_origin(tgt_path / 'linker_rom2.x', 'rom_text', sz)
+            self._add_to_section_origin(tgt_path / 'linker_rom2.x', 'rom_image_rodata', sz)
+            self._add_to_section_origin(tgt_path / 'linker_rom_debug2.x', 'rom_text', sz)
+            self._add_to_section_origin(tgt_path / 'linker_rom_debug2.x', 'rom_image_rodata', sz)
+            self._add_to_section_origin(tgt_path / 'linker_script_icache_qspi_all_coex_9117_wc_rom2.x', 'rom_image1', sz)
+            self._add_to_section_origin(tgt_path / 'linker_script_icache_qspi_all_coex_9117_wc_rom2.x', 'rom_image2', sz)
+            self._add_to_section_length(tgt_path / 'linker_script_icache_qspi_all_coex_9117_wc_rom2.x', 'qspi_memory', sz)
+            flash_results = self._make(self._METADATA[BuildType.RS9117_B0]['options'], invoc=self._COEX_PATH)
+        if flash_results['status'] == 'PASS':
+            flash_target = self._DEST_PATH / f'Si917_B0_Iso_{self._short_commit_hash}.rps'
+            flash_source = tuple(self._RELEASE_PATH.glob('*.rps'))[0]
+            shcopy(flash_source, flash_target)
+            print(paint('Flash compilation successful.', Color.GREEN))
+        else:
+            if flash_results['logs']['error']:
+                print(f'\nError log:\n{flash_results["logs"]["error"]}')
+        self.get_cmd_rc(f'git restore -- {tgt_path}')
+
+
     def execute_builds(self) -> None:
 
         if not self._builds:
@@ -928,7 +1035,9 @@ class DeveloperToolbox:
         try:
             for build in self._builds:
                 print(f'Building {paint(build.name, Color.TEAL)}...')
-                if build.name.endswith('ROM'):
+                if build == BuildType.RS9117_B0_ISO:
+                    self._build_isolation()
+                elif build.name.endswith('ROM'):
                     result = self._check_rom(build)
                     if result is False:
                         print(paint('ROM changed.', Color.RED))
